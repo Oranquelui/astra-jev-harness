@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "measured_date": "2026-09-22",
+  "kind": "historical_maintainer_reported_aggregate",
+  "raw_traces_published": false,
+  "release_wide_benchmark": false,
+  "models": {
+    "astra": "gpt-6-astra",
+    "reasoning": "low",
+    "jev": "jev-1.13.0",
+    "codex_cli": "0.153.2"
+  },
+  "controlled_rerun": {
+    "tasks": 3,
+    "trials_per_task_per_arm": 1,
+    "astra_only": {
+      "candidate_files": 28,
+      "custom_prompt_characters": 4309,
+      "input_tokens": 42714,
+      "output_tokens": 175,
+      "seconds": 18.51,
+      "checks_passed": 22,
+      "checks_total": 22
+    },
+    "astra_jev": {
+      "candidate_files": 4,
+      "custom_prompt_characters": 2581,
+      "input_tokens": 42199,
+      "output_tokens": 175,
+      "seconds": 21.53,
+      "checks_passed": 22,
+      "checks_total": 22,
+      "jev_input_tokens": 4094,
+      "jev_seconds": 1.62
+    }
+  },
+  "desktop_policy_replay": {
+    "candidate_files": 15,
+    "batch_bytes": 34852,
+    "per_file_bytes": 34634,
+    "batch_files": 15,
+    "per_file_files": 14,
+    "required_recall": null,
+    "additional_api_calls": 0
+  },
+  "not_measured": [
+    "dollar_savings",
+    "codex_weekly_limits",
+    "end_to_end_desktop_tokens"
+  ]
+}

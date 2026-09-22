@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Read-only Jev context handoff for the active Codex Desktop conversation."""
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from shared import repo_context as rc
+from shared.credentials import execution_environment
+from shared.jev import ProtocolError
+
+
+def write_json(path, value):
+    temporary = path.with_suffix('.tmp')
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
+    temporary.replace(path)
+
+
+def fresh(plan):
+    repo = Path(plan['repo'])
+    if (rc.git(repo, 'rev-parse', 'HEAD').decode().strip() != plan['head'] or
+            rc.git(repo, 'branch', '--show-current').decode().strip() != plan['branch'] or
+            rc.digest(rc.git(repo, 'status', '--porcelain=v1', '-z')) != plan['status_sha256']):
+        raise ProtocolError('Repository state changed; create a fresh context plan')
+    for name, record in plan['files'].items():
+        path = rc.safe_path(repo, name)
+        if not path.is_file() or rc.digest(path.read_bytes()) != record['sha256'] or path.stat().st_mode & 0o777 != record['mode']:
+            raise ProtocolError('Repository content changed; create a fresh context plan')
+
+
+def make_plan(repo, task, out):
+    plan = rc.snapshot(repo, task, out)
+    out = Path(out).resolve()
+    out.chmod(0o700)
+    plan['surface'] = 'desktop'
+    write_json(out / 'plan.json', plan)
+    (out / 'PLAN.md').write_text('\n'.join([
+        '# Desktop context plan', '', f"Repository: {plan['repo']}", f"HEAD: {plan['head']}",
+        f"Candidate files: {len(plan['files'])}; Jev requests: {len(rc.jev_batches(plan))}",
+        'Local snapshot only. No provider calls or target writes.',
+        'This plan grants no edit, apply, or external-action permission.',
+        'Untracked files are not included. Follow the current task and repository instructions.',
+        '', '## Task', task, '', '## Files potentially sent to Jev',
+        *['- ' + p for p in plan['files']], '', '## Excluded',
+        *[f'- {p}: {why}' for p, why in plan['excluded'].items()]]) + '\n')
+    return plan
+
+
+def load_desktop_plan(path):
+    plan = rc.load_plan(path)
+    if plan.get('surface') != 'desktop':
+        raise ProtocolError('Expected a Desktop context plan')
+    return plan
+
+
+def select(plan_dir, out, max_calls=4, policy='batch'):
+    if policy not in rc.SELECTION_POLICIES:
+        raise ProtocolError('Unknown selection policy')
+    plan_dir, out = Path(plan_dir).resolve(), Path(out).resolve()
+    plan = load_desktop_plan(plan_dir)
+    fresh(plan)
+    if out.is_relative_to(Path(plan['repo'])) or out.exists():
+        raise ProtocolError('Use a new output directory outside the source repository')
+    required = len(rc.jev_batches(plan))
+    if type(max_calls) is not int or not 1 <= max_calls <= 24 or required > max_calls:
+        raise ProtocolError(f'Plan needs {required} Jev calls; max_calls must cover it and be 1..24')
+    env, source = execution_environment()
+    if required and not env.get('TYPESAFE_API_KEY'):
+        raise ProtocolError('Jev credential unavailable: ' + source)
+    out.mkdir(parents=True, mode=0o700)
+    result_path = out / 'selection.json'
+    record = {'version': 1, 'surface': 'desktop', 'status': 'selecting',
+              'plan_dir': str(plan_dir), 'plan_sha256': rc.digest((plan_dir / 'plan.json').read_bytes()),
+              'max_calls': max_calls, 'planned_calls': required, 'attempted_calls': 0, 'policy': policy,
+              'jev_calls': [], 'astra_child_calls': 0}
+    write_json(result_path, record)
+
+    def attempt():
+        record['attempted_calls'] += 1
+        write_json(result_path, record)
+
+    def completed(value):
+        record['jev_calls'].append(value)
+        write_json(result_path, record)
+
+    previous = os.environ.get('TYPESAFE_API_KEY')
+    try:
+        if env.get('TYPESAFE_API_KEY'):
+            os.environ['TYPESAFE_API_KEY'] = env['TYPESAFE_API_KEY']
+        selected = rc.select(plan, 'jev', on_call=completed, max_calls=max_calls, on_attempt=attempt, policy=policy)
+        fresh(plan)
+        if rc.digest((plan_dir / 'plan.json').read_bytes()) != record['plan_sha256']:
+            raise ProtocolError('Plan changed during selection')
+        context = {'task': plan['task'], 'repo': plan['repo'], 'head': plan['head'],
+                   'files': {p: plan['files'][p]['content'] for p in selected['paths']}}
+        write_json(out / 'context.json', context)
+        record.update(status='selected', paths=selected['paths'], decisions=selected['decisions'],
+                      metrics=selected['metrics'], unjudged_paths=selected['unjudged_paths'],
+                      context_sha256=rc.digest((out / 'context.json').read_bytes()))
+    except Exception:
+        # No transport exception bodies or credential values are persisted.
+        record['status'] = 'failed'
+        write_json(result_path, record)
+        raise
+    finally:
+        if previous is None:
+            os.environ.pop('TYPESAFE_API_KEY', None)
+        else:
+            os.environ['TYPESAFE_API_KEY'] = previous
+    write_json(result_path, record)
+    (out / 'REPORT.md').write_text(
+        f"# Desktop context selected\n\nFiles: {len(record['paths'])}/{len(plan['files'])}. "
+        f"Jev completed calls: {len(record['jev_calls'])}; attempted: {record['attempted_calls']}. "
+        'Astra child calls: 0.\n\nThis is context selection, not implementation or verification. '
+        'The active Desktop conversation reads context.json and performs the authorized work. '
+        'Run check before edits. If the source changes, refresh the plan before selecting again.\n'
+        + f"\nPolicy: {policy}. Judged: {selected['metrics']['judged_files']}; "
+        + f"unjudged: {selected['metrics']['unjudged_files']}; excluded: {selected['metrics']['excluded_files']}.\n"
+        + f"Retained source bytes: {selected['metrics']['selected_bytes']}/{selected['metrics']['candidate_bytes']}.\n"
+        + 'Source bytes are not tokens, cost, or proof of correctness. See selection.json decisions for per-file reasons.\n')
+    return record
+
+
+def check(selection_dir):
+    selection_dir = Path(selection_dir).resolve()
+    record = json.loads((selection_dir / 'selection.json').read_text())
+    if record.get('surface') != 'desktop' or record.get('status') != 'selected':
+        raise ProtocolError('Selection did not complete; inspect saved attempts before retrying')
+    plan_dir = Path(record['plan_dir'])
+    if rc.digest((plan_dir / 'plan.json').read_bytes()) != record['plan_sha256']:
+        raise ProtocolError('Context plan changed')
+    if rc.digest((selection_dir / 'context.json').read_bytes()) != record['context_sha256']:
+        raise ProtocolError('Selected context changed')
+    fresh(load_desktop_plan(plan_dir))
+    return {'status': 'fresh', 'astra_child_calls': 0, 'target_writes': 0}
+
+
+def compare(selection_dir, required_paths=None):
+    """Compare policies against identical saved evidence, without network or writes."""
+    selection_dir = Path(selection_dir).resolve()
+    record = json.loads((selection_dir / 'selection.json').read_text())
+    if record.get('surface') != 'desktop' or record.get('status') not in ('selected', 'failed', 'selecting'):
+        raise ProtocolError('Expected a Desktop selection record')
+    plan_dir = Path(record['plan_dir'])
+    if rc.digest((plan_dir / 'plan.json').read_bytes()) != record['plan_sha256']:
+        raise ProtocolError('Recorded plan changed; comparison refused')
+    plan = load_desktop_plan(plan_dir)
+    required_paths = [] if required_paths is None else required_paths
+    if (not isinstance(required_paths, list) or any(not isinstance(p, str) for p in required_paths)
+            or len(set(required_paths)) != len(required_paths) or not set(required_paths) <= set(plan['files'])):
+        raise ProtocolError('Required labels must be unique paths from the recorded plan')
+    compared = {}
+    for policy in rc.SELECTION_POLICIES:
+        selected = rc.resolve_selection(plan, record['jev_calls'], policy)
+        missing = sorted(set(required_paths) - set(selected['paths']))
+        compared[policy] = {**selected['metrics'], 'paths': selected['paths'],
+                            'unjudged_paths': selected['unjudged_paths'],
+                            'missing_required_paths': missing,
+                            'required_recall': 1 - len(missing) / len(required_paths) if required_paths else None}
+    return {'status': 'historical_comparison', 'source_status': record['status'],
+            'additional_provider_calls': 0, 'required_paths': required_paths,
+            'quality_basis': 'caller_supplied_required_files' if required_paths else 'unlabeled_no_quality_claim',
+            'policies': compared,
+            'additional_omitted_paths': sorted(set(compared['batch']['paths']) - set(compared['per-file']['paths'])),
+            'additional_omitted_bytes': compared['batch']['selected_bytes'] - compared['per-file']['selected_bytes']}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='command', required=True)
+    sub.add_parser('doctor')
+    p = sub.add_parser('plan')
+    p.add_argument('--repo', required=True)
+    p.add_argument('--task-file', required=True)
+    p.add_argument('--out', required=True)
+    p = sub.add_parser('select')
+    p.add_argument('--plan', required=True)
+    p.add_argument('--out', required=True)
+    p.add_argument('--max-calls', type=int, default=4)
+    p.add_argument('--policy', choices=rc.SELECTION_POLICIES, default='batch')
+    p = sub.add_parser('check')
+    p.add_argument('--selection', required=True)
+    p = sub.add_parser('compare', help='Replay saved judgments without API calls or source writes')
+    p.add_argument('--selection', required=True)
+    p.add_argument('--required-file', action='append', default=[])
+    args = parser.parse_args()
+    try:
+        if args.command == 'doctor':
+            env, source = execution_environment()
+            print(json.dumps({'surface': 'desktop', 'harness_root': str(ROOT),
+                              'key_source': source, 'typesafe_key_present': bool(env.get('TYPESAFE_API_KEY'))}))
+            return 0 if env.get('TYPESAFE_API_KEY') else 1
+        if args.command == 'plan':
+            plan = make_plan(args.repo, Path(args.task_file).read_text(), args.out)
+            result = {'status': 'planned', 'files': len(plan['files']), 'planned_calls': len(rc.jev_batches(plan))}
+        elif args.command == 'select':
+            record = select(args.plan, args.out, args.max_calls, args.policy)
+            result = {'status': record['status'], 'selected_files': len(record['paths']),
+                      'jev_completed_calls': len(record['jev_calls']), 'astra_child_calls': 0}
+        elif args.command == 'compare':
+            result = compare(args.selection, args.required_file)
+        else:
+            result = check(args.selection)
+        print(json.dumps(result))
+        return 0
+    except (ProtocolError, OSError, ValueError, KeyError, TypeError):
+        # Keep error output independent of file contents and provider response bodies.
+        print('Desktop context operation failed; inspect plan freshness, call budget, credential availability and saved selection status.', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
