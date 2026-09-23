@@ -1,10 +1,10 @@
 # Astra + Jev Coding Harness
 
-[日本語](README-ja.md) · [Release v0.1.0](https://github.com/Oranquelui/astra-jev-harness/releases/tag/v0.1.0) · [Changelog](CHANGELOG.md)
+[日本語](README-ja.md) · [Release v0.2.0](https://github.com/Oranquelui/astra-jev-harness/releases/tag/v0.2.0) · [Changelog](CHANGELOG.md)
 
-Let **Jev decide which files matter**, then let **Astra write the code**.
+Narrow large repositories locally, let **Jev judge the bounded candidates**, then let **Astra write the code**.
 
-A local coding harness for Codex CLI and Codex Desktop. Give it a task such as “fix pagination without changing the public API”; it snapshots eligible files, asks Jev which ones the coding model needs, preserves dependencies, and records what was kept and why.
+A local coding harness for Codex CLI and Codex Desktop. Give it a task such as “fix pagination without changing the public API”; it snapshots eligible files, locally narrows oversized repositories, asks Jev which candidates the coding model needs, preserves dependencies, and records what was kept and why.
 
 **Experimental.** In a three-task synthetic comparison, candidate files fell **85.7%**, but Astra-reported input tokens fell only **1.2%** and elapsed time increased. Smaller file context is not the same as a cheaper agent session. [See the measurements](docs/BENCHMARKS.md).
 
@@ -92,10 +92,10 @@ python3 cli/main.py apply --run "$DEMO_ROOT/run"
 
 - **Bounded selection.** Full eligible file contents are grouped into requests. Uncertain judgments preserve context. Resolvable Python/relative JavaScript dependencies, configuration, and repository instructions are retained.
 - **Visible decisions.** Per-file probabilities, retention reasons, unjudged files, and before/after source bytes are recorded. Relevance is not a security verdict.
-- **Local policy comparison.** Replay saved judgments with no API call. Supply independently identified required files to see omissions; without labels, recall is unknown.
+- **Local policy comparison.** Replay saved judgments with no API call. Independently identified required-file labels can include paths in the plan or `scoped_out`, exposing local-scope misses separately from Jev-selection misses; without labels, recall is unknown.
 - **Freshness checks.** Desktop checks the plan and selected content against repository HEAD, branch, status, file contents, and modes. A historical comparison does not authorize using stale context.
 - **Scoped edits.** CLI verifies a candidate in Codex's read-only sandbox, checks its integrity, then applies permitted edits with collision checks and recovery records.
-- **Explicit failures.** No automatic service retries. Desktop records attempted and completed requests and refuses to reuse an output directory. Failed requests may still be billable.
+- **Explicit failures.** No automatic service retries. CLI checks the serialized worst-case Astra prompt against its 500,000-byte limit before any Jev call. Desktop records attempted and completed requests and refuses to reuse an output directory. Failed requests may still be billable.
 
 ```sh
 python3 desktop/context.py plan --repo /absolute/repo \
@@ -108,6 +108,21 @@ python3 desktop/context.py compare --selection /absolute/selection \
 ```
 
 The default `batch` policy retains an entire batch when any judgment is uncertain. The experimental `select --policy per-file` retains uncertain/unjudged files while omitting confidently irrelevant siblings. Dependencies and the global no-match fallback still apply. Compare before changing policy; fewer bytes alone do not establish correctness.
+
+## Larger repositories
+
+When eligible files exceed **2,000,000 bytes or 1,500 files**, `plan` first builds a deterministic, task-aware lexical shortlist **locally**, before any Jev request. Desktop's scoped plan is capped at 2,000,000 bytes. CLI uses a tighter 350,000-byte scoped cap to leave room under its separate 500,000-byte Astra prompt limit. Plans already within the original bounds keep their existing behavior. Full file contents are retained within the shortlist; files are not silently truncated.
+
+Use repeated `--focus-file` paths for eligible files you know the task needs. `--scope-max-calls` caps the **planned** Jev requests for a large-repository scope (default 4, range 1–24); the later `select --max-calls` execution cap remains separate. Untracked files still require `--include-file`. A focus path cannot bypass eligibility or the 100 KB per-file limit.
+
+```sh
+python3 desktop/context.py plan --repo /absolute/repo \
+  --task-file /absolute/task.txt --out /absolute/plan \
+  --focus-file src/pagination.py --focus-file tests/test_pagination.py \
+  --scope-max-calls 4
+```
+
+The same two planning flags are available in `cli/main.py plan`. Review `PLAN.md` before sending code: it reports the original eligible count/bytes, the scoped-out paths/bytes, and planned Jev calls. `plan.json` stores the totals under `scope` and omitted eligible file metadata under `scoped_out`. These files were **not judged by Jev**; they differ from protected/ineligible `excluded` files and Jev-rejected files. Instructions, key configuration, and resolvable dependencies remain in scope. The lexical stage does not translate: a Japanese-only task without an ASCII path or identifier may need `--focus-file`. If no task/file match is found **and no required path is supplied**, or mandatory files cannot fit, planning fails and asks for a more specific task or focus path. Required-file recall and Astra token effects remain unknown until independently measured. [Design and official TypeSafe references](docs/DESIGN.md).
 
 ## How much does it save?
 
@@ -128,7 +143,8 @@ These are historical measurements, **not a benchmark of every feature in this re
 
 ```mermaid
 flowchart LR
-  T[Task + local Git snapshot] --> J[Jev: file relevance judgments]
+  T[Task + local Git snapshot] --> S[Local scope if repo exceeds bounds]
+  S --> J[Jev: file relevance judgments]
   J --> P[Local policy + dependency retention]
   P --> C[CLI: Astra generation]
   C --> V[Isolated verification]
@@ -142,13 +158,13 @@ flowchart LR
 
 ## What leaves your machine
 
-`plan`, `check`, and `compare` are local. `select` sends the task, relative paths, and eligible source contents to TypeSafe. CLI generation sends selected context to Codex using your own login; the harness removes `TYPESAFE_API_KEY`, `OPENAI_API_KEY`, and `CODEX_API_KEY` from the Astra child environment. It does not export or package your Codex login.
+`plan`, `check`, and `compare` are local. `select` sends the task, relative paths, and eligible source contents to TypeSafe; locally `scoped_out` file contents are not sent to Jev. CLI generation sends selected context and at most 512 scoped-out **file names** (plus the omitted-file count) to Codex using your own login, so Astra can request a fresh plan if context is missing. The harness removes `TYPESAFE_API_KEY`, `OPENAI_API_KEY`, and `CODEX_API_KEY` from the Astra child environment. It does not export or package your Codex login.
 
 Plans, candidates, and run files contain source text. Store them outside the target repository and keep them out of Git. The source filter rejects known credential patterns and excluded file types; it is not a complete secret detector. Review `PLAN.md` before sending private code. [Security and credential handling](SECURITY.md).
 
 ## Current limits
 
-- Tracked eligible UTF-8 files plus explicitly included untracked files: up to 2 MB total, 1,500 files, and 100 KB per file. Use reviewed `plan --include-file` paths; no staging is required.
+- Tracked eligible UTF-8 files plus explicitly included untracked files: a scoped plan holds up to 2 MB total, 1,500 files, and 100 KB per file. Above 2 MB or 1,500 eligible files, local task-aware scoping applies; CLI's scoped byte cap is 350,000. Use reviewed `plan --include-file` paths for untracked files; no staging is required.
 - Files over the 22 KB batch allowance are retained without inference. All-unjudged selection can mean zero Jev calls.
 - Dependency discovery is partial. Conventional Python `src` roots, local TS aliases and `.mts` are supported; dynamic imports and arbitrary build configurations remain partial.
 - CLI verification does not install dependencies; read-only verification may not support builds that write artifacts. Passing supplied tests is not proof of complete correctness.
