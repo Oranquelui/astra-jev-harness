@@ -19,14 +19,20 @@ def save(path, value):
     temporary.replace(path)
 
 
-def require_external(path, sources=()):
+def require_external(path):
     target = Path(path).resolve()
-    bases = [Path(__file__).resolve().parents[1], *(Path(s['path']).parent for s in sources)]
-    for base in bases:
-        result = subprocess.run(['git', '-C', str(base), 'rev-parse', '--show-toplevel'],
-                                capture_output=True, timeout=15)
-        if result.returncode == 0 and target.is_relative_to(Path(result.stdout.decode().strip()).resolve()):
-            raise ProtocolError('Evidence artifacts and cache must stay outside source repositories')
+    # The evidence source may live outside the coding repo, so inspect the
+    # destination itself rather than only the source's Git ancestry.
+    probe = target
+    while not probe.exists():
+        probe = probe.parent
+    if probe.is_file():
+        probe = probe.parent
+    result = subprocess.run(['git', '-C', str(probe), 'rev-parse', '--show-toplevel'],
+                            capture_output=True, timeout=15)
+    if '.git' in target.parts or (result.returncode == 0 and
+            target.is_relative_to(Path(result.stdout.decode().strip()).resolve())):
+        raise ProtocolError('Evidence artifacts and cache must stay outside Git repositories')
 
 
 def new_directory(path):
@@ -94,7 +100,7 @@ def make_plan(task, sources, pinned, out):
     if not plan['fragments']:
         raise ProtocolError('Evidence is empty')
     plan['planned_calls'] = len(batches(plan))
-    require_external(out, plan['sources'])
+    require_external(out)
     directory = new_directory(out)
     save(directory/'plan.json', plan)
     (directory/'PLAN.md').write_text('# Evidence plan\n\n' +
@@ -177,9 +183,9 @@ def select(plan_dir, out, max_calls=4, cache_dir=None):
     plan_dir = Path(plan_dir).resolve()
     plan = load_plan(plan_dir)
     work = batches(plan)
-    require_external(out, plan['sources'])
+    require_external(out)
     if cache_dir:
-        require_external(cache_dir, plan['sources'])
+        require_external(cache_dir)
     needed = sum(read_cache(payload(plan['task'], group), cache_dir) is None for group in work)
     if type(max_calls) is not int or not 0 <= max_calls <= 24 or needed > max_calls:
         raise ProtocolError('Evidence request count exceeds the explicit cap (0..24)')

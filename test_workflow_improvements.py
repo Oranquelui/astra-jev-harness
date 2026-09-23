@@ -120,6 +120,18 @@ class RepoFixture(unittest.TestCase):
         self.assertEqual(r['failure']['http_status'],429)
         self.assertEqual(r['failure']['stage'],'context_selection')
 
+    def test_evidence_artifacts_and_cache_refuse_unrelated_git_repo(self):
+        source = self.root/'status.json'
+        source.write_text('{"status":"failed"}')
+        with self.assertRaises(jev.ProtocolError):
+            ev.make_plan('Fix', [], [source], self.repo/'evidence-plan')
+        self.assertFalse((self.repo/'evidence-plan').exists())
+        ev.make_plan('Fix', [], [source], self.root/'evidence-plan')
+        with self.assertRaises(jev.ProtocolError):
+            ev.select(self.root/'evidence-plan', self.root/'evidence-run', 0,
+                      cache_dir=self.repo/'evidence-cache')
+        self.assertFalse((self.repo/'evidence-cache').exists())
+
     def test_evidence_attaches_to_desktop_and_invalidation_follows_source(self):
         source=self.root/'status.json';source.write_text('{"status":"failed"}')
         ev.make_plan('Fix',[],[source],self.root/'eplan')
