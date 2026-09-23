@@ -1,12 +1,16 @@
 # Astra + Jev Coding Harness
 
-[日本語](README-ja.md)
+[日本語](README-ja.md) · [Release v0.1.0](https://github.com/Oranquelui/astra-jev-harness/releases/tag/v0.1.0) · [Changelog](CHANGELOG.md)
 
 Let **Jev decide which files matter**, then let **Astra write the code**.
 
 A local coding harness for Codex CLI and Codex Desktop. Give it a task such as “fix pagination without changing the public API”; it snapshots eligible files, asks Jev which ones the coding model needs, preserves dependencies, and records what was kept and why.
 
 **Experimental.** In a three-task synthetic comparison, candidate files fell **85.7%**, but Astra-reported input tokens fell only **1.2%** and elapsed time increased. Smaller file context is not the same as a cheaper agent session. [See the measurements](docs/BENCHMARKS.md).
+
+## Evidence-aware coding (experimental)
+
+Select original evaluation excerpts with source hashes and line numbers, retain pinned failure/budget records, reuse identical Jev requests, and compare saved run usage. Both CLI and Desktop accept the resulting evidence packet. [Commands and limits](docs/EVIDENCE.md).
 
 ## Pick your workflow
 
@@ -144,9 +148,9 @@ Plans, candidates, and run files contain source text. Store them outside the tar
 
 ## Current limits
 
-- Tracked, eligible UTF-8 files only: up to 2 MB total, 1,500 files, and 100 KB per file. Untracked files need separate local review; the Skill will not stage them just for selection.
+- Tracked eligible UTF-8 files plus explicitly included untracked files: up to 2 MB total, 1,500 files, and 100 KB per file. Use reviewed `plan --include-file` paths; no staging is required.
 - Files over the 22 KB batch allowance are retained without inference. All-unjudged selection can mean zero Jev calls.
-- Dependency discovery is partial. Workspace packages, `.mts` files, complex aliases, and Python `src` layouts need further work.
+- Dependency discovery is partial. Conventional Python `src` roots, local TS aliases and `.mts` are supported; dynamic imports and arbitrary build configurations remain partial.
 - CLI verification does not install dependencies; read-only verification may not support builds that write artifacts. Passing supplied tests is not proof of complete correctness.
 - Desktop has no automatic model routing, conversation compaction, or total-session token meter. The current model remains the model you selected.
 - Experimental thresholds (0.2/0.8) are not calibrated guarantees for your repository.

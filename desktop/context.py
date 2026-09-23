@@ -5,12 +5,13 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from shared import repo_context as rc
 from shared.credentials import execution_environment
-from shared.jev import ProtocolError
+from shared.jev import ProtocolError, failure_record, read_cache, jev_request
 
 
 def write_json(path, value):
@@ -31,8 +32,8 @@ def fresh(plan):
             raise ProtocolError('Repository content changed; create a fresh context plan')
 
 
-def make_plan(repo, task, out):
-    plan = rc.snapshot(repo, task, out)
+def make_plan(repo, task, out, include_paths=None):
+    plan = rc.snapshot(repo, task, out, include_paths=include_paths)
     out = Path(out).resolve()
     out.chmod(0o700)
     plan['surface'] = 'desktop'
@@ -42,7 +43,7 @@ def make_plan(repo, task, out):
         f"Candidate files: {len(plan['files'])}; Jev requests: {len(rc.jev_batches(plan))}",
         'Local snapshot only. No provider calls or target writes.',
         'This plan grants no edit, apply, or external-action permission.',
-        'Untracked files are not included. Follow the current task and repository instructions.',
+        'Untracked files are included only when explicitly listed. Follow the current task and repository instructions.',
         '', '## Task', task, '', '## Files potentially sent to Jev',
         *['- ' + p for p in plan['files']], '', '## Excluded',
         *[f'- {p}: {why}' for p, why in plan['excluded'].items()]]) + '\n')
@@ -56,18 +57,27 @@ def load_desktop_plan(path):
     return plan
 
 
-def select(plan_dir, out, max_calls=4, policy='batch'):
+def select(plan_dir, out, max_calls=4, policy='batch', cache_dir=None, evidence_dir=None):
     if policy not in rc.SELECTION_POLICIES:
         raise ProtocolError('Unknown selection policy')
     plan_dir, out = Path(plan_dir).resolve(), Path(out).resolve()
     plan = load_desktop_plan(plan_dir)
     fresh(plan)
+    packet = None
+    if evidence_dir:
+        from shared.evidence import check as check_evidence
+        packet = check_evidence(evidence_dir)
+        if packet['task'] != plan['task']:
+            raise ProtocolError('Evidence task must match the coding plan')
     if out.is_relative_to(Path(plan['repo'])) or out.exists():
         raise ProtocolError('Use a new output directory outside the source repository')
-    required = len(rc.jev_batches(plan))
+    if cache_dir and Path(cache_dir).resolve().is_relative_to(Path(plan['repo'])):
+        raise ProtocolError('Cache must be outside the source repository')
+    required = sum(read_cache(jev_request({'task': plan['task'], 'files': batch}), cache_dir) is None
+                   for batch in rc.jev_batches(plan))
     if type(max_calls) is not int or not 1 <= max_calls <= 24 or required > max_calls:
         raise ProtocolError(f'Plan needs {required} Jev calls; max_calls must cover it and be 1..24')
-    env, source = execution_environment()
+    env, source = execution_environment() if required else ({}, 'not_needed')
     if required and not env.get('TYPESAFE_API_KEY'):
         raise ProtocolError('Jev credential unavailable: ' + source)
     out.mkdir(parents=True, mode=0o700)
@@ -86,23 +96,30 @@ def select(plan_dir, out, max_calls=4, policy='batch'):
         record['jev_calls'].append(value)
         write_json(result_path, record)
 
+    started = time.monotonic()
     previous = os.environ.get('TYPESAFE_API_KEY')
     try:
         if env.get('TYPESAFE_API_KEY'):
             os.environ['TYPESAFE_API_KEY'] = env['TYPESAFE_API_KEY']
-        selected = rc.select(plan, 'jev', on_call=completed, max_calls=max_calls, on_attempt=attempt, policy=policy)
+        selected = rc.select(plan, 'jev', on_call=completed, max_calls=max_calls, on_attempt=attempt, policy=policy, cache_dir=cache_dir)
         fresh(plan)
         if rc.digest((plan_dir / 'plan.json').read_bytes()) != record['plan_sha256']:
             raise ProtocolError('Plan changed during selection')
         context = {'task': plan['task'], 'repo': plan['repo'], 'head': plan['head'],
                    'files': {p: plan['files'][p]['content'] for p in selected['paths']}}
+        if packet is not None:
+            check_evidence(evidence_dir)
+            context['evidence'] = packet
+            record['evidence_selection_dir'] = str(Path(evidence_dir).resolve())
         write_json(out / 'context.json', context)
         record.update(status='selected', paths=selected['paths'], decisions=selected['decisions'],
                       metrics=selected['metrics'], unjudged_paths=selected['unjudged_paths'],
                       context_sha256=rc.digest((out / 'context.json').read_bytes()))
-    except Exception:
+    except Exception as exc:
         # No transport exception bodies or credential values are persisted.
         record['status'] = 'failed'
+        record['failure'] = failure_record(exc, 'context_selection')
+        record['seconds'] = time.monotonic()-started
         write_json(result_path, record)
         raise
     finally:
@@ -110,10 +127,11 @@ def select(plan_dir, out, max_calls=4, policy='batch'):
             os.environ.pop('TYPESAFE_API_KEY', None)
         else:
             os.environ['TYPESAFE_API_KEY'] = previous
+    record['seconds'] = time.monotonic()-started
     write_json(result_path, record)
     (out / 'REPORT.md').write_text(
         f"# Desktop context selected\n\nFiles: {len(record['paths'])}/{len(plan['files'])}. "
-        f"Jev completed calls: {len(record['jev_calls'])}; attempted: {record['attempted_calls']}. "
+        f"Jev completed calls: {sum(not c.get('reused', False) for c in record['jev_calls'])}; attempted: {record['attempted_calls']}. "
         'Astra child calls: 0.\n\nThis is context selection, not implementation or verification. '
         'The active Desktop conversation reads context.json and performs the authorized work. '
         'Run check before edits. If the source changes, refresh the plan before selecting again.\n'
@@ -135,6 +153,9 @@ def check(selection_dir):
     if rc.digest((selection_dir / 'context.json').read_bytes()) != record['context_sha256']:
         raise ProtocolError('Selected context changed')
     fresh(load_desktop_plan(plan_dir))
+    if record.get('evidence_selection_dir'):
+        from shared.evidence import check as check_evidence
+        check_evidence(record['evidence_selection_dir'])
     return {'status': 'fresh', 'astra_child_calls': 0, 'target_writes': 0}
 
 
@@ -174,12 +195,15 @@ def main():
     sub.add_parser('doctor')
     p = sub.add_parser('plan')
     p.add_argument('--repo', required=True)
+    p.add_argument('--include-file', action='append', default=[])
     p.add_argument('--task-file', required=True)
     p.add_argument('--out', required=True)
     p = sub.add_parser('select')
     p.add_argument('--plan', required=True)
     p.add_argument('--out', required=True)
     p.add_argument('--max-calls', type=int, default=4)
+    p.add_argument('--cache-dir')
+    p.add_argument('--evidence')
     p.add_argument('--policy', choices=rc.SELECTION_POLICIES, default='batch')
     p = sub.add_parser('check')
     p.add_argument('--selection', required=True)
@@ -194,12 +218,13 @@ def main():
                               'key_source': source, 'typesafe_key_present': bool(env.get('TYPESAFE_API_KEY'))}))
             return 0 if env.get('TYPESAFE_API_KEY') else 1
         if args.command == 'plan':
-            plan = make_plan(args.repo, Path(args.task_file).read_text(), args.out)
+            plan = make_plan(args.repo, Path(args.task_file).read_text(), args.out, args.include_file)
             result = {'status': 'planned', 'files': len(plan['files']), 'planned_calls': len(rc.jev_batches(plan))}
         elif args.command == 'select':
-            record = select(args.plan, args.out, args.max_calls, args.policy)
+            record = select(args.plan, args.out, args.max_calls, args.policy, args.cache_dir, args.evidence)
             result = {'status': record['status'], 'selected_files': len(record['paths']),
-                      'jev_completed_calls': len(record['jev_calls']), 'astra_child_calls': 0}
+                      'jev_completed_calls': sum(not c.get('reused', False) for c in record['jev_calls']),
+                      'jev_reused_calls': sum(bool(c.get('reused')) for c in record['jev_calls']), 'astra_child_calls': 0}
         elif args.command == 'compare':
             result = compare(args.selection, args.required_file)
         else:

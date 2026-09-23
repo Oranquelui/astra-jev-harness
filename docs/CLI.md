@@ -30,3 +30,7 @@ The verification command runs through `codex sandbox --permission-profile :read-
 Jev: at most 24 requests; Astra: at most two generations, the second only for requested context expansion. No automatic provider retries. Authentication, transport, schema, and verification failures are distinct from successful implementation. Generated edits and tests need normal review.
 
 `result.json.selection` includes probabilities, per-file retention reasons, unjudged paths, and source-byte metrics. These are context diagnostics, not security or correctness guarantees. CLI keeps the conservative batch policy; experimental per-file selection belongs to the Desktop helper.
+
+## Evidence, explicit includes and reuse
+
+`plan --include-file`, `run --evidence` and `run --cache-dir` are documented in [EVIDENCE.md](EVIDENCE.md), alongside safe failure diagnostics and `measure.py`. Reuse never grants permission to repeat a failed provider call.

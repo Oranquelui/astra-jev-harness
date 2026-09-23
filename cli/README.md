@@ -1,3 +1,102 @@
-# Codex CLI
+# Astra＋Jev Coding Harness
 
-[CLI reference](../docs/CLI.md) · [English quickstart](../README.md#cli-an-isolated-example) · [日本語](../README-ja.md#cliで試す合成リポジトリ)
+主対象はLayerisとUnsolojiです。既存ソースの編集、計画で指定したソース・テストの追加、既存テストの更新を、確認可能な計画・差分・検証結果として作るローカルCLIです。Astraは既存のCodexログイン、Jevは`TYPESAFE_API_KEY`を利用します。CodexのModelメニューやユーザー設定を書き換えません。
+
+## 基本の流れ
+
+CLIの入口は `python3 cli/main.py` です。`run`時、環境変数が未設定ならmacOSキーチェーン（service `astra-jev-harness` / account `TYPESAFE_API_KEY`）から補います。`plan` / `verify` / `apply` / ヘルプと明示的な`--mode astra`ではキーチェーンを読みません。`doctor`でキーの有無・取得元だけを確認できます。`keychain_timeout` / `keychain_unavailable`はキーの不在を意味しません。
+
+Desktop版は別方式です。[Desktopの説明](../desktop/README.md)を参照してください。
+
+リポジトリルートで実行します。必要なのはPython 3.10以降、Git、ログイン済みCodex CLIです。現在の実動作検証環境はmacOS・Codex CLI 0.153.2です。
+
+```sh
+# task.txtに修正課題を書き、ローカルで対象を確認。API呼び出しなし。
+python3 cli/main.py plan --repo /absolute/path/to/repo \
+  --task-file /absolute/path/to/task.txt --out /absolute/path/to/plan
+
+# PLAN.mdの対象を確認して実行。この段階で対象コードをプロバイダーに送ります。
+python3 cli/main.py run --plan /absolute/path/to/plan \
+  --out /absolute/path/to/run --mode auto \
+  --verify-json '["python3", "-B", "-m", "unittest", "discover"]'
+
+# changes.diffと検証結果を確認後、元リポジトリへ適用。
+python3 cli/main.py apply --run /absolute/path/to/run
+```
+
+`--verify-json`は対象プロジェクトに合ったテストコマンドへ変更してください。コマンドは引数配列で受け取り、shell文字列として実行しません。モデルは検証コマンドを決定しません。
+
+## 新規ファイルと既存テストの変更計画
+
+追加先と更新するテストは、plan時にrepoルートからの相対パスで指定します。各オプションは繰り返し指定できます。
+
+```sh
+python3 cli/main.py plan --repo /absolute/path/to/repo \
+  --task-file /absolute/path/to/task.txt --out /absolute/path/to/plan \
+  --allow-create src/helper.py \
+  --allow-create tests/test_helper.py \
+  --allow-test-edit tests/test_existing.py
+```
+
+- `--allow-create`は存在しないファイルだけを許可します。必要な親ディレクトリは作成します。既存・未追跡・ignoredファイルへの上書き、symlink、パスの脱出、重複・大小文字だけが異なる追加先、保護対象は拒否します。
+- `--allow-test-edit`はスナップショットに含まれる既存テストだけを許可します。`test` / `tests` / `__tests__`配下、`test_*`、`*_test.py`、`.test.` / `.spec.`を含むファイルと`conftest.py`をテストとして扱います。
+- 指定がなければ従来どおり既存ソースだけを編集します。指定パスは許可範囲であり、すべてを変更する義務ではありません。AGENTS.md・policiesは変更できません。
+- 許可内容は`PLAN.md`と`plan.json`に保存し、生成スキーマとローカル検査の両方に使います。許可を追加する場合は新しいplanを作成してください。追加権限を持つplanはversion 2で保存し、旧CLIでは実行できません。version 1の既存planは引き続き読み込めます。
+- `changes.diff`には新規・空ファイルも表示します。新規ファイルのモードは0644です。既存ファイルのモードは保持します。
+
+検証コマンドには既存回帰テストと課題の受入条件を含めてください。テスト編集後の終了コード0だけでは、既存の検査を弱めていないことまで保証できません。テスト差分と実装差分の両方をレビューします。
+
+## ルーティング
+
+- `auto`: 対象コードが12KB未満ならAstra単独、それ以上ならJevを使用。12KBは運用上の仮置きで、費用対効果を保証する閾値ではありません。
+- `astra`: 全候補をAstraへ渡します。Jevキー不要。
+- `jev`: Jevによる選別を必ず実行します。
+
+Jevはファイル本文をバッチで読み、確率が0.8以上を採用、0.2以下を除外します。曖昧なバッチは全件を保持。全体で対象が見つからなければ全件に戻します。大きな単独ファイルは途中で切らず保持します。AGENTS.md・policy・主要設定と、静的に解決できるPython・相対JSインポートを追加で保持します。パスエイリアスや動的importを完全に追跡する解析器ではありません。
+
+Astraが不足ファイルを指定した場合は、同じスナップショットから追加して1回だけ再生成できます。Astraのツール使用は検知して失敗扱いにします。
+
+## 状態と復旧
+
+| 状態 | 意味 |
+|---|---|
+| `unverified` | 差分を作成したがテストコマンド未指定。適用不可 |
+| `verification_failed` | テストまたは実行環境で失敗。適用不可 |
+| `verified` | 指定テストが成功。レビュー後に適用可能 |
+| `applied` | 明示的なapplyで元ファイルへ適用済み。コミット・pushはしていない |
+| `failed` / `cancelled` / `apply_failed` | 失敗・中断。詳細はresult.json |
+
+テスト環境の問題を直した後は、モデルを再呼び出さず検証だけを再実行できます。
+
+```sh
+python3 cli/main.py verify --run /absolute/path/to/run
+```
+
+元ファイル、Git状態、計画、候補コード（追加ファイルを含む）が変わっていれば適用を拒否します。新規ファイルは宛先が存在しない場合だけ原子的に追加し、適用中に現れたファイルを上書きしません。
+
+適用中の通常の書き込みエラーでは、他者に変更されていない適用済みファイルを戻し、今回追加したファイルと空の親ディレクトリを取り除きます。他者の変更や復旧時のエラーで戻せないファイルは`result.json`の`recovery_incomplete`へ記録します。プロセス強制終了や電源断、同時に親ディレクトリが置換される場合などに対する完全なトランザクション保証はありません。
+
+## 範囲と制限
+
+- Git管理されたUTF-8テキストを対象にします。作業中の追跡済み変更はその内容をスナップショットします。未追跡ファイルは対象外です。
+- `.env`、鍵・DBファイル、生成物、ルートのdata/uploads、credentialパターンを含むファイルなどを除外し、理由をPLAN.mdへ記録します。パターン検査は秘密情報の完全検出を保証しません。送信前に対象を確認してください。
+- 元リポジトリへの書き込みはapplyのみです。実行用コピーには採用されなかったファイルも含め、テストに必要な全スナップショットを配置します。
+- ファイル削除、AGENTS.md・policiesの変更、マイグレーション適用、デプロイ、Model登録は扱いません。
+- スナップショットと生成後の候補は最大2MB・1500ファイル、各ファイル100KB。追加予定ファイルも件数に含めます。Jev最大24リクエスト、Astra最大2回。超過時は切り捨てず停止します。
+- 依存パッケージの自動インストールはしません。node_modulesやvenvはコピーしません。依存関係のあるプロジェクトでは、隔離コピーで動く検証環境を先に用意する必要があります。
+- 検証はCodexの`:read-only`プロファイルで実行し、環境変数は必要最小限にします。macOSで候補への書き込みとネットワークの拒否を実測済みです。ユーザーのHOME等の読み取りを完全隔離する仕組みではなく、敵対的な任意コード用サンドボックスではありません。
+- 検証コマンドの終了コード0だけで品質を完全に保証しません。適切なテストを指定し、差分をレビューしてください。
+
+## 再現用サンプル
+
+```sh
+python3 make_demo.py /absolute/path/to/new-demo-repo
+```
+
+53個の対象ファイルを持つ合成リポジトリを作成します。ページ番号を1始まりにし、size=Noneなら既存設定、size<1なら1を使う修正課題で検証できます。テストコマンドは上記unittestです。初期状態では6つの境界値が失敗します。
+
+自動テストは`python3 -m unittest -v`で実行できます。旧3課題ベンチマークは`harness.py`としてそのまま残しています。
+
+## 選別の診断
+
+Jev利用時の`result.json` → `selection`には、ファイルごとの判定・保持理由、未判定パス、候補と選択後のバイト数を記録します。CLIの既定は従来のバッチ単位の保守的保持です。Desktopの実験用per-file方式をCLI生成へ自動適用しません。
