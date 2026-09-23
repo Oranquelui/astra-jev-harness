@@ -7,9 +7,10 @@ from pathlib import Path, PurePosixPath
 import re
 import subprocess
 
-from shared.jev import ProtocolError, call_jev
+from shared.jev import (ProtocolError, call_jev, jev_request, read_cache, write_cache, request_jev, select_context, request_hash)
+from shared.dependency_paths import local_candidates, variants
 
-EXTENSIONS = {'.py', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.jsonc', '.toml', '.yaml', '.yml', '.md', '.txt', '.css', '.html', '.sql'}
+EXTENSIONS = {'.py', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.json', '.jsonc', '.toml', '.yaml', '.yml', '.md', '.txt', '.css', '.html', '.sql'}
 EXCLUDED_DIRS = {'.git', '.venv', 'venv', 'node_modules', 'dist', 'build', '.next', '__pycache__'}
 SECRET = re.compile(r'apikey_[a-zA-Z0-9_]{40,}|sk-(?:proj-)?[a-zA-Z0-9_-]{25,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|(?:api_key|password|secret|token)\s*[:=]\s*[\"\'][^\"\'\n]{24,}[\"\']', re.I)
 
@@ -42,7 +43,7 @@ def safe_path(root, rel):
 
 
 def eligibility(rel):
-    p = PurePosixPath(rel)
+    p = PurePosixPath(rel.lower())
     if any(x in EXCLUDED_DIRS for x in p.parts) or p.parts[0] in {'data', 'uploads'}:
         return 'generated_or_data_directory'
     if p.name.startswith('.env') or p.suffix.lower() in {'.pem', '.key', '.p12', '.sqlite', '.db'} or p.name in {'auth.json', 'credentials.json', 'secrets.json'}:
@@ -111,7 +112,7 @@ def editable_paths(plan, paths):
                    (not is_test(p) or p in plan.get('test_edit_paths', []))} | set(plan.get('create_paths', [])))
 
 
-def snapshot(repo, task, out, create_paths=None, test_edit_paths=None):
+def snapshot(repo, task, out, create_paths=None, test_edit_paths=None, include_paths=None):
     repo = Path(repo).resolve()
     if Path(git(repo, 'rev-parse', '--show-toplevel').decode().strip()).resolve() != repo:
         raise ProtocolError('Pass the exact Git repository root')
@@ -124,7 +125,18 @@ def snapshot(repo, task, out, create_paths=None, test_edit_paths=None):
         raise ProtocolError('Task is empty, oversized, or contains a credential-like value')
     before = git(repo, 'status', '--porcelain=v1', '-z')
     files, excluded = {}, {}
-    for raw in git(repo, 'ls-files', '-z').split(b'\0'):
+    included = include_paths or []
+    if not isinstance(included, list) or any(not isinstance(p, str) for p in included):
+        raise ProtocolError('Explicit includes must be relative paths')
+    for name in included:
+        safe_path(repo, name)
+        if eligibility(name) or not safe_path(repo, name).is_file():
+            raise ProtocolError('Explicit include is protected, missing, or unsupported')
+        ignored = subprocess.run(['git', '-C', str(repo), 'check-ignore', '--quiet', '--', name], capture_output=True)
+        if ignored.returncode != 1:
+            raise ProtocolError('Explicit include is ignored or cannot be checked')
+    tracked = [r for r in git(repo, 'ls-files', '-z').split(b'\0') if r]
+    for raw in sorted(set(tracked + [p.encode() for p in included])):
         if not raw:
             continue
         rel = raw.decode('utf-8')
@@ -146,6 +158,8 @@ def snapshot(repo, task, out, create_paths=None, test_edit_paths=None):
                           'content': source}
         except (ProtocolError, UnicodeError):
             excluded[rel] = 'symlink_or_non_utf8'
+    if any(p not in files for p in included):
+        raise ProtocolError('Explicit include failed content eligibility checks')
     if not files or sum(f['bytes'] for f in files.values()) > 2000000 or len(files) > 1500:
         raise ProtocolError('Snapshot empty or exceeds v0.1 bounds: 2MB / 1500 files')
     if git(repo, 'status', '--porcelain=v1', '-z') != before:
@@ -155,7 +169,8 @@ def snapshot(repo, task, out, create_paths=None, test_edit_paths=None):
             raise ProtocolError('Repository content changed during snapshot; try again')
     manifest = {'version': 1, 'repo': str(repo), 'head': git(repo, 'rev-parse', 'HEAD').decode().strip(),
                 'branch': git(repo, 'branch', '--show-current').decode().strip(),
-                'status_sha256': digest(before), 'task': task, 'files': files, 'excluded': excluded}
+                'status_sha256': digest(before), 'task': task, 'files': files, 'excluded': excluded,
+                'explicit_includes': included}
     if create_paths or test_edit_paths:
         manifest.update(version=2, create_paths=create_paths or [], test_edit_paths=test_edit_paths or [])
     validate_change_scope(manifest)
@@ -193,35 +208,40 @@ def dependencies(files, selected):
     """Follow resolvable Python and relative JS imports; preserve configs/instructions."""
     keep = set(selected)
     config = {'package.json', 'tsconfig.json', 'pyproject.toml', 'requirements.txt', 'pytest.ini', 'setup.cfg', 'conftest.py'}
-    keep.update(p for p in files if is_instruction(p) or PurePosixPath(p).name in config)
+    keep.update(p for p in files if is_instruction(p) or PurePosixPath(p).name in config
+                or (PurePosixPath(p).name.startswith('tsconfig') and p.endswith('.json')))
     queue = list(keep)
     while queue:
         path = queue.pop()
+        if path.endswith('.py'):
+            for parent in PurePosixPath(path).parents:
+                init = str(parent / '__init__.py')
+                if init in files and init not in keep:
+                    keep.add(init)
+                    queue.append(init)
         source = files[path]
         imports = []
         if path.endswith('.py'):
             try:
                 for node in ast.walk(ast.parse(source)):
                     if isinstance(node, ast.Import):
-                        imports.extend(x.name.replace('.', '/') for x in node.names)
+                        imports.extend(stem for x in node.names for stem in local_candidates(files, path, x.name.replace('.', '/'), python=True))
                     elif isinstance(node, ast.ImportFrom):
                         base = PurePosixPath(path).parent
                         for _ in range(max(0, node.level - 1)):
                             base = base.parent
                         module = (node.module or '').replace('.', '/')
                         stem = str(base / module) if node.level else module
-                        imports.append(stem)
-                        imports.extend(str(PurePosixPath(stem) / x.name) for x in node.names)
+                        bases = [stem] if node.level else local_candidates(files, path, stem, python=True)
+                        imports.extend(bases)
+                        imports.extend(str(PurePosixPath(b) / x.name) for b in bases for x in node.names)
             except SyntaxError:
                 pass
         else:
-            imports = [str(PurePosixPath(path).parent / x) for x in re.findall(r'(?:from\s+|require\s*\(|import\s*\()?[\"\'](\.{1,2}/[^\"\']+)[\"\']', source)]
+            specs = re.findall(r'''(?:from\s+|require\s*\(\s*|import\s*\(?\s*)["']([^"']+)["']''', source)
+            imports = [stem for spec in specs for stem in local_candidates(files, path, spec)]
         for stem in imports:
-            # Normalize without allowing filesystem traversal outside this virtual tree.
-            import posixpath
-            stem = posixpath.normpath(stem)
-            options = [stem, stem + '.py', stem + '/__init__.py', stem + '.ts', stem + '.tsx', stem + '.js', stem + '/index.ts', stem + '/index.js']
-            for dep in options:
+            for dep in variants(stem):
                 if dep in files and dep not in keep:
                     keep.add(dep)
                     queue.append(dep)
@@ -307,7 +327,7 @@ def resolve_selection(plan, calls, policy='batch'):
                         'retained_byte_ratio': after / before if before else None}}
 
 
-def select(plan, mode='auto', on_call=None, max_calls=24, on_attempt=None, policy='batch'):
+def select(plan, mode='auto', on_call=None, max_calls=24, on_attempt=None, policy='batch', cache_dir=None):
     if policy not in SELECTION_POLICIES:
         raise ProtocolError('Unknown selection policy')
     files = {p: r['content'] for p, r in plan['files'].items()}
@@ -317,13 +337,29 @@ def select(plan, mode='auto', on_call=None, max_calls=24, on_attempt=None, polic
     batches = jev_batches(plan)
     if type(max_calls) is not int or not 1 <= max_calls <= 24:
         raise ProtocolError('Jev max_calls must be between 1 and 24')
-    if len(batches) > max_calls:
+    needed = sum(read_cache(jev_request({'task': plan['task'], 'files': batch}), cache_dir) is None
+                 for batch in batches)
+    if needed > max_calls:
         raise ProtocolError(f'Jev request budget exceeds {max_calls} calls; narrow the plan')
+    if cache_dir is not None and Path(cache_dir).resolve().is_relative_to(Path(plan['repo']).resolve()):
+        raise ProtocolError('Cache must be outside the source repository')
     calls = []
     for batch in batches:
-        if on_attempt:
-            on_attempt()
-        result = call_jev({'task': plan['task'], 'files': batch})
+        case = {'task': plan['task'], 'files': batch}
+        payload = jev_request(case)
+        cached = read_cache(payload, cache_dir)
+        if cached is not None:
+            result = {**select_context(batch, cached), 'reused': True, 'seconds': 0, 'usage': None,
+                      'model': cached['model'], 'request_sha256': request_hash(payload)}
+        else:
+            if on_attempt:
+                on_attempt()
+            if cache_dir is None:
+                result = call_jev(case)
+            else:
+                value, meta = request_jev(payload)
+                result = {**select_context(batch, value), **meta}
+                write_cache(payload, value, cache_dir)
         calls.append(result)
         if on_call:
             on_call(result)
