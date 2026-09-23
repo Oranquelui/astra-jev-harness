@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from cli.benchmark import MODEL, RUNTIME_ARGS, ProtocolError, parse_codex_events, save
 from shared.jev import failure_record
 from shared.repo_context import (digest, git, load_plan as load_context_plan, safe_path, select, snapshot, SECRET,
-                          editable_paths, check_creation_destinations)
+                          editable_paths, check_creation_destinations, check_plan_fresh, scope_terms)
 
 
 def load_plan(path):
@@ -45,10 +45,13 @@ def bounded_process(argv, cwd, env, timeout, stdin=None):
     return {'returncode': proc.returncode, 'stdout': stdout, 'stderr': stderr}
 
 
-def generate(plan, paths, folder, timeout):
+def generation_prompt(plan, paths):
     editable = editable_paths(plan, paths)
     if not editable:
         raise ProtocolError('No editable source files in context')
+    task_terms = scope_terms(plan['task'])
+    omitted = sorted(plan.get('scoped_out', {}),
+                     key=lambda p: (-len(task_terms & scope_terms(p)), p))
     schema = {'type': 'object', 'additionalProperties': False, 'required': ['summary', 'needs_context', 'files'],
               'properties': {'summary': {'type': 'string'}, 'needs_context': {'type': 'array', 'items': {'type': 'string'}},
                              'files': {'type': 'array', 'items': {'type': 'object', 'additionalProperties': False,
@@ -57,6 +60,9 @@ def generate(plan, paths, folder, timeout):
     payload = {'task': plan['task'], 'repository_file_names': list(plan['files']),
                'files': {p: plan['files'][p]['content'] for p in paths}, 'editable_paths': editable,
                'new_file_paths': plan.get('create_paths', []), 'editable_test_paths': plan.get('test_edit_paths', [])}
+    if omitted:
+        payload['scoped_out_file_names'] = omitted[:512]
+        payload['scoped_out_file_count'] = len(omitted)
     if plan.get('evidence_packet'):
         payload['evidence'] = plan['evidence_packet']
     prompt = ('Implement the coding task using only the provided context. '
@@ -67,8 +73,14 @@ def generate(plan, paths, folder, timeout):
               'Do not delete files or edit guidance or unrelated code. If context is insufficient, return needed repository paths '
               'in needs_context and an empty files array. If no changes are needed, explain in summary.\n' +
               json.dumps(payload, ensure_ascii=False))
+    return prompt, schema
+
+
+def generate(plan, paths, folder, timeout):
+    prompt, schema = generation_prompt(plan, paths)
+    editable = editable_paths(plan, paths)
     if len(prompt.encode()) > 500000:
-        raise ProtocolError('Astra context exceeds v0.1 500KB limit; narrow the plan')
+        raise ProtocolError('Astra context exceeds 500KB limit; narrow the plan')
     folder.mkdir()
     save(folder / 'schema.json', schema)
     (folder / 'prompt.txt').write_text(prompt)
@@ -103,8 +115,13 @@ def generate(plan, paths, folder, timeout):
         raise ProtocolError('Invalid Astra output')
     if not isinstance(answer['summary'], str) or not isinstance(answer['needs_context'], list) or not isinstance(answer['files'], list):
         raise ProtocolError('Invalid Astra output types')
-    if any(not isinstance(p, str) or p not in plan['files'] for p in answer['needs_context']):
+    if any(not isinstance(p, str) or p not in plan['files'] and p not in plan.get('scoped_out', {})
+           for p in answer['needs_context']):
         raise ProtocolError('Requested context is outside the snapshot')
+    missing_scope = sorted(set(answer['needs_context']) & set(plan.get('scoped_out', {})))
+    if missing_scope:
+        raise ProtocolError('Requested context was scoped out; create a fresh plan with --focus-file '
+                            + ' --focus-file '.join(missing_scope))
     edits = {}
     for item in answer['files']:
         if not isinstance(item, dict) or set(item) != {'path', 'content'}:
@@ -207,6 +224,7 @@ def reverify(run_dir, timeout):
 def run(plan_dir, out, mode, command, timeout, cache_dir=None, evidence_dir=None):
     plan_dir, out = Path(plan_dir).resolve(), Path(out).resolve()
     plan = load_plan(plan_dir)
+    check_plan_fresh(plan)
     check_creation_destinations(plan)
     if evidence_dir:
         from shared.evidence import check as check_evidence
@@ -216,6 +234,9 @@ def run(plan_dir, out, mode, command, timeout, cache_dir=None, evidence_dir=None
         plan['evidence_packet'] = packet
     if command is not None and (not isinstance(command, list) or not command or any(not isinstance(s, str) or '\0' in s for s in command)):
         raise ProtocolError('Verification must be a nonempty JSON array of command arguments')
+    largest_prompt, _ = generation_prompt(plan, list(plan['files']))
+    if len(largest_prompt.encode()) > 500000:
+        raise ProtocolError('Astra context exceeds 500KB before Jev; replan with a smaller scope')
     if out.exists() or out.is_relative_to(Path(plan['repo'])):
         raise ProtocolError('Choose a new run directory outside the source repository')
     out.mkdir(parents=True)
@@ -235,6 +256,7 @@ def run(plan_dir, out, mode, command, timeout, cache_dir=None, evidence_dir=None
             save(out / 'result.json', result)
         result['stage'] = 'context_selection'
         selection = select(plan, mode, on_call=record_jev, on_attempt=attempt_jev, cache_dir=cache_dir)
+        check_plan_fresh(plan)
         result['selection'] = selection
         save(out / 'result.json', result)
         paths = sorted(set(selection['paths']) | set(plan.get('test_edit_paths', [])))
@@ -255,6 +277,7 @@ def run(plan_dir, out, mode, command, timeout, cache_dir=None, evidence_dir=None
             paths = sorted(set(paths) | set(answer['needs_context']))
         if answer['needs_context']:
             raise ProtocolError('Additional context is still required after one expansion')
+        check_plan_fresh(plan)
         if evidence_dir:
             check_evidence(evidence_dir)
         result.update(summary=answer['summary'], final_context_paths=paths,
@@ -306,11 +329,7 @@ def apply(run_dir):
     plan = load_plan(plan_dir)
     repo = Path(plan['repo']).resolve()
     check_creation_destinations(plan)
-    if git(repo, 'rev-parse', 'HEAD').decode().strip() != plan['head'] or digest(git(repo, 'status', '--porcelain=v1', '-z')) != plan['status_sha256']:
-        raise ProtocolError('Repository Git state changed since planning')
-    for p, record in plan['files'].items():
-        if digest(safe_path(repo, p).read_bytes()) != record['sha256']:
-            raise ProtocolError('Source changed since planning: ' + p)
+    check_plan_fresh(plan)
     if candidate_hashes(run_dir / 'candidate', candidate_paths(plan, result)) != result['candidate_hashes']:
         raise ProtocolError('Candidate changed since verification')
     originals, replacements = {}, {}
@@ -386,6 +405,8 @@ def main():
     p = commands.add_parser('plan', help='Local inspection only; no API calls')
     p.add_argument('--repo', type=Path, required=True)
     p.add_argument('--include-file', action='append', default=[])
+    p.add_argument('--focus-file', action='append', default=[])
+    p.add_argument('--scope-max-calls', type=int, default=4)
     p.add_argument('--task-file', type=Path, required=True)
     p.add_argument('--out', type=Path, required=True)
     p.add_argument('--allow-create', action='append', default=[], metavar='PATH',
@@ -409,7 +430,9 @@ def main():
     try:
         if args.cmd == 'plan':
             data = snapshot(args.repo, args.task_file.read_text(), args.out,
-                            create_paths=args.allow_create, test_edit_paths=args.allow_test_edit, include_paths=args.include_file)
+                            create_paths=args.allow_create, test_edit_paths=args.allow_test_edit,
+                            include_paths=args.include_file, focus_paths=args.focus_file,
+                            scope_max_calls=args.scope_max_calls, scope_max_bytes=350000)
             print(f"Plan ready: {args.out.resolve() / 'PLAN.md'} ({len(data['files'])} files)")
         elif args.cmd == 'run':
             data = run(args.plan, args.out, args.mode, json.loads(args.verify_json) if args.verify_json else None, args.timeout, args.cache_dir, args.evidence)

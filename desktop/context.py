@@ -21,19 +21,12 @@ def write_json(path, value):
 
 
 def fresh(plan):
-    repo = Path(plan['repo'])
-    if (rc.git(repo, 'rev-parse', 'HEAD').decode().strip() != plan['head'] or
-            rc.git(repo, 'branch', '--show-current').decode().strip() != plan['branch'] or
-            rc.digest(rc.git(repo, 'status', '--porcelain=v1', '-z')) != plan['status_sha256']):
-        raise ProtocolError('Repository state changed; create a fresh context plan')
-    for name, record in plan['files'].items():
-        path = rc.safe_path(repo, name)
-        if not path.is_file() or rc.digest(path.read_bytes()) != record['sha256'] or path.stat().st_mode & 0o777 != record['mode']:
-            raise ProtocolError('Repository content changed; create a fresh context plan')
+    rc.check_plan_fresh(plan)
 
 
-def make_plan(repo, task, out, include_paths=None):
-    plan = rc.snapshot(repo, task, out, include_paths=include_paths)
+def make_plan(repo, task, out, include_paths=None, focus_paths=None, scope_max_calls=4):
+    plan = rc.snapshot(repo, task, out, include_paths=include_paths,
+                       focus_paths=focus_paths, scope_max_calls=scope_max_calls)
     out = Path(out).resolve()
     out.chmod(0o700)
     plan['surface'] = 'desktop'
@@ -41,11 +34,18 @@ def make_plan(repo, task, out, include_paths=None):
     (out / 'PLAN.md').write_text('\n'.join([
         '# Desktop context plan', '', f"Repository: {plan['repo']}", f"HEAD: {plan['head']}",
         f"Candidate files: {len(plan['files'])}; Jev requests: {len(rc.jev_batches(plan))}",
+        *([f"Local shortlist: {plan['scope']['eligible_files']} eligible files / "
+           f"{plan['scope']['eligible_bytes']} bytes; {plan['scope']['scoped_out_files']} files / "
+           f"{plan['scope']['scoped_out_bytes']} bytes scoped out before Jev.",
+           'Required-file recall is unknown. Review scoped-out paths below.'
+           ] if plan.get('scope') else []),
         'Local snapshot only. No provider calls or target writes.',
         'This plan grants no edit, apply, or external-action permission.',
         'Untracked files are included only when explicitly listed. Follow the current task and repository instructions.',
         '', '## Task', task, '', '## Files potentially sent to Jev',
-        *['- ' + p for p in plan['files']], '', '## Excluded',
+        *['- ' + p for p in plan['files']], '', '## Scoped out before Jev',
+        *[f'- {p}: {r["bytes"]} bytes' for p, r in plan.get('scoped_out', {}).items()],
+        '', '## Excluded',
         *[f'- {p}: {why}' for p, why in plan['excluded'].items()]]) + '\n')
     return plan
 
@@ -137,7 +137,9 @@ def select(plan_dir, out, max_calls=4, policy='batch', cache_dir=None, evidence_
         'Run check before edits. If the source changes, refresh the plan before selecting again.\n'
         + f"\nPolicy: {policy}. Judged: {selected['metrics']['judged_files']}; "
         + f"unjudged: {selected['metrics']['unjudged_files']}; excluded: {selected['metrics']['excluded_files']}.\n"
-        + f"Retained source bytes: {selected['metrics']['selected_bytes']}/{selected['metrics']['candidate_bytes']}.\n"
+        + f"Retained source bytes after Jev: {selected['metrics']['selected_bytes']}/{selected['metrics']['candidate_bytes']}.\n"
+        + f"Locally scoped out before Jev: {selected['metrics']['prefiltered_files']} files / "
+        + f"{selected['metrics']['prefiltered_bytes']} bytes. Required-file recall is unknown without labels.\n"
         + 'Source bytes are not tokens, cost, or proof of correctness. See selection.json decisions for per-file reasons.\n')
     return record
 
@@ -171,19 +173,28 @@ def compare(selection_dir, required_paths=None):
     plan = load_desktop_plan(plan_dir)
     required_paths = [] if required_paths is None else required_paths
     if (not isinstance(required_paths, list) or any(not isinstance(p, str) for p in required_paths)
-            or len(set(required_paths)) != len(required_paths) or not set(required_paths) <= set(plan['files'])):
-        raise ProtocolError('Required labels must be unique paths from the recorded plan')
+            or len(set(required_paths)) != len(required_paths)
+            or not set(required_paths) <= set(plan['files']) | set(plan.get('scoped_out', {}))):
+        raise ProtocolError('Required labels must be unique eligible paths from the recorded plan')
+    missing_in_scope = sorted(set(required_paths) & set(plan.get('scoped_out', {})))
+    scope_recall = (1 - len(missing_in_scope) / len(required_paths)) if required_paths else None
+    within_scope_labels = set(required_paths) & set(plan['files'])
     compared = {}
     for policy in rc.SELECTION_POLICIES:
         selected = rc.resolve_selection(plan, record['jev_calls'], policy)
         missing = sorted(set(required_paths) - set(selected['paths']))
+        missing_within_scope = within_scope_labels - set(selected['paths'])
         compared[policy] = {**selected['metrics'], 'paths': selected['paths'],
                             'unjudged_paths': selected['unjudged_paths'],
                             'missing_required_paths': missing,
-                            'required_recall': 1 - len(missing) / len(required_paths) if required_paths else None}
+                            'required_recall': 1 - len(missing) / len(required_paths) if required_paths else None,
+                            'within_scope_required_recall':
+                                1 - len(missing_within_scope) / len(within_scope_labels)
+                                if within_scope_labels else None}
     return {'status': 'historical_comparison', 'source_status': record['status'],
             'additional_provider_calls': 0, 'required_paths': required_paths,
             'quality_basis': 'caller_supplied_required_files' if required_paths else 'unlabeled_no_quality_claim',
+            'scope_required_recall': scope_recall, 'missing_in_scope': missing_in_scope,
             'policies': compared,
             'additional_omitted_paths': sorted(set(compared['batch']['paths']) - set(compared['per-file']['paths'])),
             'additional_omitted_bytes': compared['batch']['selected_bytes'] - compared['per-file']['selected_bytes']}
@@ -196,6 +207,8 @@ def main():
     p = sub.add_parser('plan')
     p.add_argument('--repo', required=True)
     p.add_argument('--include-file', action='append', default=[])
+    p.add_argument('--focus-file', action='append', default=[])
+    p.add_argument('--scope-max-calls', type=int, default=4)
     p.add_argument('--task-file', required=True)
     p.add_argument('--out', required=True)
     p = sub.add_parser('select')
@@ -218,7 +231,8 @@ def main():
                               'key_source': source, 'typesafe_key_present': bool(env.get('TYPESAFE_API_KEY'))}))
             return 0 if env.get('TYPESAFE_API_KEY') else 1
         if args.command == 'plan':
-            plan = make_plan(args.repo, Path(args.task_file).read_text(), args.out, args.include_file)
+            plan = make_plan(args.repo, Path(args.task_file).read_text(), args.out,
+                             args.include_file, args.focus_file, args.scope_max_calls)
             result = {'status': 'planned', 'files': len(plan['files']), 'planned_calls': len(rc.jev_batches(plan))}
         elif args.command == 'select':
             record = select(args.plan, args.out, args.max_calls, args.policy, args.cache_dir, args.evidence)

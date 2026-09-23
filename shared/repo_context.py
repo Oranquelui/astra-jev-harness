@@ -79,7 +79,7 @@ def validate_change_scope(plan):
                 raise ProtocolError('Protected or ineligible change path: ' + p)
     if len(plan['files']) + len(creates) > 1500:
         raise ProtocolError('Planned files exceed 1500 file limit')
-    occupied = list(plan['files']) + list(plan.get('excluded', {}))
+    occupied = list(plan['files']) + list(plan.get('excluded', {})) + list(plan.get('scoped_out', {}))
     for p in creates:
         folded = p.casefold()
         for other in occupied + creates:
@@ -112,7 +112,69 @@ def editable_paths(plan, paths):
                    (not is_test(p) or p in plan.get('test_edit_paths', []))} | set(plan.get('create_paths', [])))
 
 
-def snapshot(repo, task, out, create_paths=None, test_edit_paths=None, include_paths=None):
+SCOPE_STOPWORDS = {'add', 'and', 'code', 'coding', 'file', 'files', 'fix', 'for', 'from',
+                   'implement', 'into', 'new', 'repo', 'repository', 'task', 'test',
+                   'tests', 'the', 'then', 'this', 'update', 'use', 'using', 'with'}
+
+
+def scope_terms(value):
+    """Cheap, deterministic search terms; cross-language recall is not assumed."""
+    split_camel = re.sub(r'([a-z0-9])([A-Z])', r'\1 \2', value)
+    return {term for term in re.findall(r'[a-z][a-z0-9]*', split_camel.casefold())
+            if len(term) >= 3 and term not in SCOPE_STOPWORDS}
+
+
+def scoped_shortlist(files, task, includes, focus, test_edits, max_calls, max_bytes):
+    """Local fast-search stage. Jev judges only the reviewed, bounded shortlist."""
+    if type(max_calls) is not int or not 1 <= max_calls <= 24:
+        raise ProtocolError('Scope max_calls must be between 1 and 24')
+    if type(max_bytes) is not int or not 1 <= max_bytes <= 2000000:
+        raise ProtocolError('Scope max_bytes must be between 1 and 2,000,000')
+    contents = {p: record['content'] for p, record in files.items()}
+    required = set(includes) | set(focus) | set(test_edits)
+    required.update(p for p in files if p in task)
+    missing = required - set(files)
+    if missing:
+        raise ProtocolError('Focused or required path is not an eligible snapshot file: ' + sorted(missing)[0])
+
+    def bounded(paths):
+        chosen = {p: files[p] for p in sorted(paths)}
+        return (len(chosen) <= 1500 and sum(r['bytes'] for r in chosen.values()) <= max_bytes
+                and len(jev_batches({'files': chosen})) <= max_calls)
+
+    selected = set(dependencies(contents, required))
+    if not bounded(selected):
+        raise ProtocolError('Required focus, guidance, configuration or dependency closure exceeds scope budget; narrow --focus-file or raise --scope-max-calls')
+    terms = scope_terms(task)
+    ranked = []
+    for path, source in contents.items():
+        if path in selected:
+            continue
+        leaf = scope_terms(PurePosixPath(path).stem)
+        path_terms = scope_terms(path)
+        content_terms = scope_terms(source)
+        score = sum(12 for term in terms & leaf) + sum(4 for term in terms & (path_terms - leaf))
+        score += len(terms & content_terms)
+        if score:
+            ranked.append((-score, path))
+    ranked.sort()
+    if not ranked and not required:
+        raise ProtocolError('No local task match for a large repository; pass --focus-file for reviewed source paths')
+    accepted = 0
+    for _, path in ranked:
+        expanded = set(dependencies(contents, selected | {path}))
+        if bounded(expanded):
+            selected = expanded
+            accepted += 1
+        elif not accepted and not required:
+            raise ProtocolError('Top local match exceeds the scope budget; pass --focus-file or raise --scope-max-calls')
+    if not selected or (not accepted and not required):
+        raise ProtocolError('No task candidate fits the scope budget; pass --focus-file or raise --scope-max-calls')
+    return selected
+
+
+def snapshot(repo, task, out, create_paths=None, test_edit_paths=None, include_paths=None,
+             focus_paths=None, scope_max_calls=4, scope_max_bytes=2000000):
     repo = Path(repo).resolve()
     if Path(git(repo, 'rev-parse', '--show-toplevel').decode().strip()).resolve() != repo:
         raise ProtocolError('Pass the exact Git repository root')
@@ -126,8 +188,15 @@ def snapshot(repo, task, out, create_paths=None, test_edit_paths=None, include_p
     before = git(repo, 'status', '--porcelain=v1', '-z')
     files, excluded = {}, {}
     included = include_paths or []
+    focused = focus_paths or []
     if not isinstance(included, list) or any(not isinstance(p, str) for p in included):
         raise ProtocolError('Explicit includes must be relative paths')
+    if not isinstance(focused, list) or any(not isinstance(p, str) for p in focused):
+        raise ProtocolError('Focused files must be relative paths')
+    if len(set(focused)) != len(focused):
+        raise ProtocolError('Duplicate focused file')
+    for name in focused:
+        safe_path(repo, name)
     for name in included:
         safe_path(repo, name)
         if eligibility(name) or not safe_path(repo, name).is_file():
@@ -160,17 +229,42 @@ def snapshot(repo, task, out, create_paths=None, test_edit_paths=None, include_p
             excluded[rel] = 'symlink_or_non_utf8'
     if any(p not in files for p in included):
         raise ProtocolError('Explicit include failed content eligibility checks')
-    if not files or sum(f['bytes'] for f in files.values()) > 2000000 or len(files) > 1500:
-        raise ProtocolError('Snapshot empty or exceeds v0.1 bounds: 2MB / 1500 files')
+    if not files:
+        raise ProtocolError('Snapshot has no eligible files')
+    if any(p not in files for p in focused):
+        raise ProtocolError('Focused file is not an eligible tracked or explicitly included file')
+    if type(scope_max_calls) is not int or not 1 <= scope_max_calls <= 24:
+        raise ProtocolError('Scope max_calls must be between 1 and 24')
+    if type(scope_max_bytes) is not int or not 1 <= scope_max_bytes <= 2000000:
+        raise ProtocolError('Scope max_bytes must be between 1 and 2,000,000')
+    eligible_count, eligible_bytes = len(files), sum(f['bytes'] for f in files.values())
+    all_files = files
+    scoped_out, scope = {}, None
+    if eligible_bytes > 2000000 or eligible_count > 1500:
+        kept = scoped_shortlist(files, task, included, focused, test_edit_paths or [],
+                                scope_max_calls, scope_max_bytes)
+        scoped_out = {p: {key: r[key] for key in ('sha256', 'bytes', 'mode')}
+                      for p, r in files.items() if p not in kept}
+        files = {p: r for p, r in files.items() if p in kept}
+        scope = {'strategy': 'local_task_shortlist', 'eligible_files': eligible_count,
+                 'eligible_bytes': eligible_bytes, 'scoped_out_files': len(scoped_out),
+                 'scoped_out_bytes': sum(r['bytes'] for r in scoped_out.values()),
+                 'max_calls': scope_max_calls, 'max_bytes': scope_max_bytes,
+                 'planned_calls': len(jev_batches({'files': files})),
+                 'focus_paths': focused}
     if git(repo, 'status', '--porcelain=v1', '-z') != before:
         raise ProtocolError('Repository status changed during snapshot; try again')
-    for rel, record in files.items():
+    for rel, record in all_files.items():
         if digest(safe_path(repo, rel).read_bytes()) != record['sha256']:
             raise ProtocolError('Repository content changed during snapshot; try again')
     manifest = {'version': 1, 'repo': str(repo), 'head': git(repo, 'rev-parse', 'HEAD').decode().strip(),
                 'branch': git(repo, 'branch', '--show-current').decode().strip(),
                 'status_sha256': digest(before), 'task': task, 'files': files, 'excluded': excluded,
                 'explicit_includes': included}
+    if focused:
+        manifest['focus_paths'] = focused
+    if scope is not None:
+        manifest.update(scoped_out=scoped_out, scope=scope)
     if create_paths or test_edit_paths:
         manifest.update(version=2, create_paths=create_paths or [], test_edit_paths=test_edit_paths or [])
     validate_change_scope(manifest)
@@ -180,11 +274,16 @@ def snapshot(repo, task, out, create_paths=None, test_edit_paths=None, include_p
     lines = ['# Repository plan', '', f"Repository: {repo}", f"HEAD: {manifest['head']}",
              f"Included: {len(files)} files / {sum(f['bytes'] for f in files.values())} bytes",
              f"Excluded: {len(excluded)} files. No API calls or repository writes have occurred.", '',
+             *([f"Local shortlist: {eligible_count} eligible files / {eligible_bytes} bytes; "
+                f"{len(scoped_out)} files / {scope['scoped_out_bytes']} bytes scoped out; "
+                f"{scope['planned_calls']} planned Jev calls.",
+                'Scoped-out files were not judged by Jev. Required-file recall is unknown.', ''] if scope else []),
              '## Task', task, '', '## Permitted new files', *['- ' + p for p in manifest.get('create_paths', [])],
              '', '## Permitted existing test edits', *['- ' + p for p in manifest.get('test_edit_paths', [])],
              '', 'Existing source files remain editable; other tests and instructions are read-only.',
              'Review existing regression tests and task acceptance checks separately from generated tests.',
              '', '## Files potentially sent when running', *['- ' + p for p in files],
+             '', '## Scoped out before Jev', *[f'- {p}: {r["bytes"]} bytes' for p, r in scoped_out.items()],
              '', '## Excluded', *[f'- {p}: {reason}' for p, reason in excluded.items()]]
     (out / 'PLAN.md').write_text('\n'.join(lines) + '\n')
     return manifest
@@ -200,8 +299,55 @@ def load_plan(path):
         safe_path(Path(path), rel)
         if digest(r['content'].encode()) != r['sha256'] or eligibility(rel) or SECRET.search(r['content']):
             raise ProtocolError('Plan file integrity or eligibility check failed')
+    scoped_out = plan.get('scoped_out', {})
+    if not isinstance(scoped_out, dict) or set(scoped_out) & set(plan['files']):
+        raise ProtocolError('Invalid scoped-out file index')
+    for rel, record in scoped_out.items():
+        safe_path(Path(plan['repo']), rel)
+        if (not isinstance(record, dict) or set(record) != {'sha256', 'bytes', 'mode'}
+                or not isinstance(record['sha256'], str) or not re.fullmatch(r'[0-9a-f]{64}', record['sha256'])
+                or type(record['bytes']) is not int or not 0 <= record['bytes'] <= 100000
+                or type(record['mode']) is not int or not 0 <= record['mode'] <= 0o777
+                or eligibility(rel)):
+            raise ProtocolError('Invalid scoped-out file metadata')
+    if sum(r['bytes'] for r in plan['files'].values()) > 2000000 or len(plan['files']) > 1500:
+        raise ProtocolError('Plan exceeds repository snapshot bounds')
+    focused = plan.get('focus_paths', [])
+    if (not isinstance(focused, list) or any(not isinstance(p, str) for p in focused)
+            or len(set(focused)) != len(focused) or not set(focused) <= set(plan['files'])):
+        raise ProtocolError('Invalid focused-file record')
+    scope = plan.get('scope')
+    if scope is not None:
+        if (not isinstance(scope, dict) or scope.get('strategy') != 'local_task_shortlist'
+                or scope.get('eligible_files') != len(plan['files']) + len(scoped_out)
+                or scope.get('eligible_bytes') != sum(r['bytes'] for r in plan['files'].values()) + sum(r['bytes'] for r in scoped_out.values())
+                or scope.get('scoped_out_files') != len(scoped_out)
+                or scope.get('scoped_out_bytes') != sum(r['bytes'] for r in scoped_out.values())
+                or scope.get('planned_calls') != len(jev_batches(plan))
+                or scope.get('focus_paths') != focused
+                or type(scope.get('max_calls')) is not int or not 1 <= scope['max_calls'] <= 24
+                or type(scope.get('max_bytes')) is not int or not 1 <= scope['max_bytes'] <= 2000000
+                or scope['planned_calls'] > scope['max_calls']
+                or sum(r['bytes'] for r in plan['files'].values()) > scope['max_bytes']):
+            raise ProtocolError('Invalid local shortlist record')
+    elif scoped_out:
+        raise ProtocolError('Scoped-out files require scope metadata')
     validate_change_scope(plan)
     return plan
+
+
+def check_plan_fresh(plan):
+    """Verify both sent and locally omitted source against the reviewed plan."""
+    repo = Path(plan['repo'])
+    if (git(repo, 'rev-parse', 'HEAD').decode().strip() != plan['head']
+            or git(repo, 'branch', '--show-current').decode().strip() != plan['branch']
+            or digest(git(repo, 'status', '--porcelain=v1', '-z')) != plan['status_sha256']):
+        raise ProtocolError('Repository state changed; create a fresh context plan')
+    for name, record in {**plan['files'], **plan.get('scoped_out', {})}.items():
+        path = safe_path(repo, name)
+        if (not path.is_file() or digest(path.read_bytes()) != record['sha256']
+                or path.stat().st_mode & 0o777 != record['mode']):
+            raise ProtocolError('Repository content changed; create a fresh context plan')
 
 
 def dependencies(files, selected):
@@ -302,6 +448,9 @@ def resolve_selection(plan, calls, policy='batch'):
     for path in unjudged:
         chosen.add(path)
         reasons[path].append('unjudged')
+    for path in plan.get('focus_paths', []):
+        chosen.add(path)
+        reasons[path].append('explicit_focus')
     if not chosen:
         chosen.update(files)
         for path in files:
@@ -319,12 +468,17 @@ def resolve_selection(plan, calls, policy='batch'):
                            'reasons': reasons[path] or ['confidently_irrelevant']}
     before = sum(len(s.encode()) for s in files.values())
     after = sum(len(files[p].encode()) for p in selected)
+    prefiltered = plan.get('scoped_out', {})
+    prefiltered_bytes = sum(r['bytes'] for r in prefiltered.values())
     return {'paths': selected, 'policy': policy, 'decisions': decisions, 'unjudged_paths': unjudged,
             'metrics': {'candidate_files': len(files), 'selected_files': len(selected),
                         'judged_files': len(probabilities), 'unjudged_files': len(unjudged),
                         'excluded_files': len(plan.get('excluded', {})), 'candidate_bytes': before,
                         'selected_bytes': after, 'omitted_bytes': before - after,
-                        'retained_byte_ratio': after / before if before else None}}
+                        'retained_byte_ratio': after / before if before else None,
+                        'prefiltered_files': len(prefiltered), 'prefiltered_bytes': prefiltered_bytes,
+                        'eligible_files': len(files) + len(prefiltered),
+                        'eligible_bytes': before + prefiltered_bytes}}
 
 
 def select(plan, mode='auto', on_call=None, max_calls=24, on_attempt=None, policy='batch', cache_dir=None):
