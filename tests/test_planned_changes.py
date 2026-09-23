@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import coding
 import repo_context as rc
-import test_coding
+from tests import test_coding
 
 
 class PlannedChangesTests(unittest.TestCase):

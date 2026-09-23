@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 
-LAUNCHER = Path(__file__).parent / 'desktop/skills/astra-jev-coding/scripts/context.py'
+LAUNCHER = Path(__file__).resolve().parent.parent / 'desktop/skills/astra-jev-coding/scripts/context.py'
 
 
 class SkillLauncherTests(unittest.TestCase):
