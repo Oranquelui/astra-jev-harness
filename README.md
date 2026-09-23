@@ -1,6 +1,8 @@
-# Astra + Jev Coding Harness
+# Astra + Jev: Codex Agent Skill and CLI Harness
 
 [日本語](README-ja.md) · [Release v0.2.0](https://github.com/Oranquelui/astra-jev-harness/releases/tag/v0.2.0) · [Changelog](CHANGELOG.md)
+
+This repository provides the **[`astra-jev-coding` Codex Agent Skill](desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately.
 
 Narrow large repositories locally, let **Jev judge the bounded candidates**, then let **Astra write the code**.
 

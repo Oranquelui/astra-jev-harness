@@ -111,7 +111,7 @@ class DesktopTests(unittest.TestCase):
 
     def test_desktop_process_does_not_import_cli_implementation(self):
         script = 'import sys; from desktop import context; assert not any(x.startswith("cli.") for x in sys.modules)'
-        result = subprocess.run([os.sys.executable, '-c', script], cwd=Path(__file__).parent, capture_output=True, text=True)
+        result = subprocess.run([os.sys.executable, '-c', script], cwd=Path(__file__).resolve().parent.parent, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_cli_rejects_desktop_context_plan(self):

@@ -148,7 +148,7 @@ class StagedScopeTests(unittest.TestCase):
         task = self.root / 'task.txt'
         task.write_text('Fix checkout pricing in src/checkout.py\n')
         out = self.next_plan()
-        command = [sys.executable, str(Path(__file__).parent / 'cli' / 'coding.py'), 'plan',
+        command = [sys.executable, str(Path(__file__).resolve().parent.parent / 'cli' / 'coding.py'), 'plan',
                    '--repo', str(self.repo), '--task-file', str(task), '--out', str(out),
                    '--focus-file', 'src/checkout.py', '--scope-max-calls', '4']
         result = subprocess.run(command, capture_output=True, text=True)

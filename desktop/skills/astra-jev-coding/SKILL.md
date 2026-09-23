@@ -1,6 +1,6 @@
 ---
 name: astra-jev-coding
-description: "Use Astra + Jev for coding tasks when the user selects this harness. In Codex Desktop, Jev selects repository context and the active conversation model implements and tests the change with native tools."
+description: "Codex Agent Skill for Astra + Jev coding in Codex Desktop. Jev selects repository context; the active conversation model implements and tests the change with native tools."
 ---
 
 # Astra + Jev in Codex Desktop

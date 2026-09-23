@@ -1,6 +1,6 @@
-# Codex Desktop app版
+# Codex Desktop用Agent Skill
 
-現在の会話モデル（Astraを選択した場合はAstra）が実装・レビュー・検証を行い、Jevをコンテキスト選別に使います。`desktop/context.py`は選別用のローカルツールです。別のCodex CLIを起動してコード生成する方式は[cli/](../cli/README.md)へ分離しました。
+[`astra-jev-coding`](skills/astra-jev-coding/SKILL.md)はCodex Desktopで使うCodex Agent Skillです。現在の会話モデル（Astraを選択した場合はAstra）が実装・レビュー・検証を行い、Jevをコンテキスト選別に使います。`desktop/context.py`は選別用のローカルツールです。別のCodex CLIを起動してコード生成する方式は[cli/](../cli/README.md)へ分離しました。
 
 Python 3.10以降とGitを使用し、追加Pythonライブラリは不要です。下記はリポジトリルートから実行します。
 

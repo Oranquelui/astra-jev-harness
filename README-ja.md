@@ -1,6 +1,8 @@
-# Astra + Jev Coding Harness
+# Astra + Jev：CodexエージェントスキルとCLIハーネス
 
 [English](README.md) · [リリース v0.2.0](https://github.com/Oranquelui/astra-jev-harness/releases/tag/v0.2.0) · [変更履歴](CHANGELOG.md)
+
+このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。
 
 **大きなrepoでは先に候補を絞り、Jevが候補を判断し、Astraがコードを書く。**
 
