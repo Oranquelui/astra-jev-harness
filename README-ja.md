@@ -1,6 +1,6 @@
 # Astra + Jev：Codex・Claude Code向けエージェントスキル
 
-[English](README.md) · [バージョン 0.4.0](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
+[English](README.md) · [バージョン 0.5.0](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
 
 このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](Codex%20Desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。別途、**Claude Code用の[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md)**を追加し、同じコンテキスト選別を現在のClaude Codeセッションで使えるようにしました。
 
@@ -12,7 +12,13 @@ Codex CLI・Codex Desktop・Claude Code向けのローカルCoding Harnessです
 
 **実験段階です。** **Astra Extra High（`xhigh`）**で合成CLI課題を修正・テストまで比較すると、**Astra入力27.0%減、Jev込みのStandard API単価換算27.2%減**でした。両方式とも同じ6件の確認に成功。所要時間はこの比較では7.3%減でしたが、別の`medium`比較では34.6%増でした。各方式1試行であり、一般的な高速化やDesktopでの効果は示しません。[測定条件と結果](docs/BENCHMARKS.md)。
 
-## 未リリース：Codex CLIのモデル設定を継承
+## v0.5.0：任意の進捗ログ選別
+
+Desktop Skillにコマンドラッパーを追加しました。原文stdoutをGit外へ保存し、Jevが全文を確認した進捗チャンクだけを選別して、保持した原文と復元先を返します。診断・必須文字列・不確実/未判定部分を残し、失敗時は元の出力を返します。通常のCodex CLIセッションからも明示的に使えます。自動フック・履歴圧縮・モデル変更は行いません。
+
+合成ログ1件では、返却stdoutが**19,885→7,601 bytes（61.8%減）**となり、省略マーカー・復元先を含めて**必須5項目すべてを保持**、原文の完全一致も確認しました。Jevは**2回、入力7,172／出力195 tokens**を使用。これは**AstraのToken・総費用・実装完了時間の削減測定ではありません**。[使い方と制限](docs/TOOL-OUTPUT.md)・[集計値](benchmarks/tool-output-smoke.json)。
+
+### Codex CLIのモデル設定を継承
 
 CLIハーネスはAstra・Mediumへの固定をやめ、設定された`model`と`model_reasoning_effort`を引き継ぎます。Desktop・Claude Codeハーネスは従来どおり現在の会話設定を使います。生成プロセスの隔離は維持し、モデル設定だけを渡します。未設定項目はCodexの既定を使います。独自プロバイダーとprofile選択は未対応です。指定値と確認できない応答モデルは分けて記録し、新しいtoken・費用削減は主張しません。[詳細と制限](Codex%20cli/README.md#モデル設定)。
 

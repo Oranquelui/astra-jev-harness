@@ -123,3 +123,9 @@ Jev利用時の`result.json` → `selection`には、ファイルごとの判定
 ローカルの`config/read`で生成前に読み取り、２項目だけを隔離した生成プロセスに渡します。MCP・プラグイン・権限など他の設定はコピーしません。設定取得に失敗した場合はJev呼び出し前に停止します。独自プロバイダーと旧形式のprofile指定は未対応のため拒否します。`--profile`の選択にも対応していません。
 
 記録の`requested_model`・`requested_reasoning`は指定値です。実際に応答したモデル・推論強度がCLIイベントから確認できないため、`model`・`reasoning`はnullとし、モデル別費用も不明として扱います。過去のベンチマーク設定・測定結果は変更しません。[詳細](../docs/CLI.md#model-verification-and-limits)。
+
+## Optional command-output selection / 任意のコマンド出力選別
+
+The root [`output.py`](../output.py) wrapper is available for explicitly routed commands in a normal Codex CLI session. It preserves the selected model/login and retains recoverable original logs. It is not automatically invoked by this harness's isolated generation process. See [usage, limits and measurements](../docs/TOOL-OUTPUT.md).
+
+通常のCodex CLIセッションで長い進捗ログを扱う場合は、rootの`output.py`を明示的に使えます。モデルとログインを維持し、原文を後から復元できます。このハーネス内の隔離された生成プロセスには自動適用しません。
