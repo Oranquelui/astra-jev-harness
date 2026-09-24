@@ -8,7 +8,9 @@ Narrow large repositories locally, let **Jev judge the bounded candidates**, the
 
 A local coding harness for Codex CLI and Codex Desktop. Give it a task such as “fix pagination without changing the public API”; it snapshots eligible files, locally narrows oversized repositories, asks Jev which candidates the coding model needs, preserves dependencies, and records what was kept and why.
 
-**Experimental.** v0.3.0 improves selection coverage and makes context/cost accounting explicit. **End-to-end Astra token and total-cost savings from this upgrade are not established.** The historical 1.2% Astra-input reduction below predates this version. [Measurements and limits](docs/BENCHMARKS.md).
+**Goal:** reduce Astra token consumption and combined inference cost while preserving coding correctness and avoiding extra turnaround time. File selection is a means to that goal.
+
+**Experimental.** One synthetic CLI coding task at **Astra Extra High (`xhigh`)** used **27.0% fewer Astra input tokens** and **27.2% less at equivalent Standard API rates**, including Jev. Both modes passed the same six checks. Elapsed time was 7.3% shorter in this pair, but 34.6% longer in a separate `medium` pair. Each is one trial per mode, not a general speedup or Desktop result. [Measurements and limits](docs/BENCHMARKS.md).
 
 ## What improved in v0.3.0?
 
@@ -141,6 +143,26 @@ The same two planning flags are available in `cli/main.py plan`. Review `PLAN.md
 
 ## How much does it save?
 
+### Completed coding task: Astra only versus Astra + Jev
+
+Both arms used the same v0.3.0-based code, plan, **`gpt-6-astra` at Extra High (`xhigh`)**, and six held-out behavior checks. Each generated the same fix in one call. This is one synthetic task and one trial per mode, not a measured v0.2.0-to-v0.3.0 coding speedup. Extra High was set in an isolated test export; the distributed CLI still defaults to `medium`, and the Desktop conversation's setting is independent.
+
+| Through verified candidate, Extra High | Astra only | Astra + Jev | Observed change |
+|---|---:|---:|---:|
+| Astra input tokens | 19,198 | 14,011 | **27.0% fewer** |
+| Astra output tokens, including reasoning | 193 | 126 | 67 fewer in this pair |
+| Astra generation calls | 1 | 1 | No rework reduction |
+| Jev input tokens | 0 | 6,784 | Selection overhead |
+| Combined Standard API-rate estimate | $0.201630 | $0.146695 | **27.2% lower** |
+| Elapsed time through verification | 12.78 s | 11.85 s | **7.3% shorter in this pair** |
+| Behavior checks passed | 6 / 6 | 6 / 6 | Same observed result |
+
+The earlier **`medium`** pair on the same task used 19,204 → 14,013 Astra input tokens (**27.0% fewer**) and $0.195190 → $0.143565 at equivalent API rates (**26.4% lower**), but took 9.07 → 12.22 s (**34.6% longer**). Both passed the same six checks. We retain both results because timing and output-token differences from single generations do not establish a reliable speedup.
+
+The price comparison applies [published Astra rates](https://developers.openai.com/api/docs/models/gpt-6-astra) and [Jev rates](https://docs.typesafe.ai/models) to measured usage, including Jev overhead. All four generations explicitly reported zero cache reads and writes. **It is an API-rate equivalent, not a measured reduction in the Codex bill or subscription quota.** Fixed run order, the same Skill-catalog warning in each generation, an explicitly pinned target, and a fixture dominated by unrelated prose limit the result. The complete Desktop conversation was not measured. [Method](docs/BENCHMARKS.md#completed-cli-coding-check--2026-09-24) · [Extra High aggregate](benchmarks/cli-coding-xhigh-v0.3.0.json) · [Medium aggregate](benchmarks/cli-coding-v0.3.0.json).
+
+The next efficiency target is reliable completed-task savings on representative tasks, including selection latency, rereads and rework. A smaller context alone does not meet that target.
+
 ### v0.2.0 → v0.3.0: the same synthetic input
 
 One two-file fixture, the same task and content hashes, conservative `batch` policy, and `main.py` explicitly pinned. This is a selection check, not a completed coding benchmark.
@@ -154,7 +176,7 @@ One two-file fixture, the same task and content hashes, conservative `batch` pol
 | Jev output tokens | 21 | 76 |
 | Estimated Jev API cost | $0.000016464 | $0.000284928 |
 
-The unrelated 27,278-byte file is now judged and omitted: **99.73% fewer retained source bytes in this deliberately simple example**. This is not a token-saving percentage. Judging the previously skipped content added an estimated **$0.000268464** in Jev cost. Whether Astra saves more than that remains unmeasured, including cache effects and subsequent rereads. Prices use actual reported Jev input at **$0.042 per million**, with free output, checked 2026-09-24; these are estimates, not invoices. [Official price](https://docs.typesafe.ai/models).
+The unrelated 27,278-byte file is now judged and omitted: **99.73% fewer retained source bytes in this deliberately simple example**. This is not a token-saving percentage. Judging the previously skipped content added an estimated **$0.000268464** in Jev cost. These selection-only runs do not measure Astra cost. The separate coding pairs above compare modes within v0.3.0; they do not measure a completed-task upgrade from v0.2.0. Prices use actual reported Jev input at **$0.042 per million**, with free output, checked 2026-09-24; these are estimates, not invoices. [Official price](https://docs.typesafe.ai/models).
 
 A separate 75-byte fixture using the new `auto` mode made **zero Jev calls**, avoiding selection overhead while retaining its source. Neither check measured complete Desktop conversation usage or Codex subscription limits. [Method, limitations and comparison formula](docs/BENCHMARKS.md#v030-upgrade-check--2026-09-24) · [Aggregate data](benchmarks/context-selection-v0.3.0.json).
 

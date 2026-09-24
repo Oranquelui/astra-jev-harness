@@ -4,10 +4,15 @@
 
 - New CLI/Desktop plans judge complete source ranges instead of bypassing files over 22 KB. Request budgeting includes serialized questions and metadata; old plans remain reproducible.
 - Desktop supports bounded `read` and explicit `auto`/`local` bypass modes; the installed Skill selects before loading file bodies.
-- Usage separates ordinary input and provider cache reads/writes. Optional exact-model prices produce estimates only with complete accounting. No new savings claim.
+- Usage separates ordinary input and provider cache reads/writes. Optional exact-model prices report known partial subtotals; complete totals require full accounting. Efficiency claims require completed-task measurements.
 - 新規planの大きいファイルを全範囲判定し、旧plan互換を維持。Desktopに範囲読込とJev省略モード、計測にcache内訳と任意単価の見積を追加。節約率の実証は別途必要です。
-- Validation: 114 offline tests passed. On one identical two-file synthetic fixture, v0.2.0 → v0.3.0 fully judged files increased 1 → 2 and retained source bytes fell 27,353 → 75. Jev input increased 392 → 6,784 tokens; its API price estimate increased $0.000016464 → $0.000284928. This is a selection check, not an Astra savings result.
-- 検証は114テスト成功。同じ合成入力で全体を判定できたファイルは1→2、保持本文は27,353→75 bytes。Jev入力・費用見積は増えました。今回のAstra全体・総費用削減率は未実証です。README英日版に旧版比較と限界を追記しました。
+- Validation: 119 offline tests passed. On one identical two-file synthetic fixture, v0.2.0 → v0.3.0 fully judged files increased 1 → 2 and retained source bytes fell 27,353 → 75. Jev input increased 392 → 6,784 tokens; its API price estimate increased $0.000016464 → $0.000284928. This is a selection check, not an Astra savings result.
+- 検証は119テスト成功。同じ合成入力で全体を判定できたファイルは1→2、保持本文は27,353→75 bytes。Jev入力・費用見積は増えました。この選別比較だけではAstra全体・総費用の削減を判断できません。README英日版に旧版比較と限界を追記しました。
+- Completed v0.3.0 CLI coding checks used Extra High and Medium separately, one synthetic task per setting and one trial per mode. All four generations produced the same fix and passed six held-out checks. Extra High: Astra input 19,198 → 14,011 (27.0% fewer), combined Standard API-equivalent $0.201630 → $0.146695 (27.2% lower), elapsed 12.78 → 11.85 s (7.3% shorter). Medium: input 27.0% fewer and equivalent cost 26.4% lower, but elapsed time 34.6% longer. No general speedup, Desktop saving or subscription reduction is established; the distributed CLI default is still Medium.
+- CLI `cache_write_input_tokens` is now recognized; conflicting fields remain unknown. Jev input totals no longer require inapplicable cache details. Fragment line numbers use the same CR/Unicode separator rules as Desktop reads.
+- 実修正の比較はExtra HighとMediumを分離し、全4回とも同じ修正と6件の確認に成功。Extra Highは入力27.0%減・API換算27.2%減・時間7.3%減。Mediumは入力27.0%減・換算26.4%減でしたが時間34.6%増。各1試行のため高速化は断定せず、Desktop・実請求・契約枠への効果とも分けて掲載しました。配布CLIの既定はMediumのままです。
+- CLI cache書込tokenの別名対応、Jev入力の表示、CR・Unicode改行時の行番号も修正しました。
+- [Completed coding method / 実修正の比較条件](docs/BENCHMARKS.md#completed-cli-coding-check--2026-09-24) · [Extra High data / 集計値](benchmarks/cli-coding-xhigh-v0.3.0.json) · [Medium data / 集計値](benchmarks/cli-coding-v0.3.0.json)
 - [Version comparison and method / バージョン比較と方法](docs/BENCHMARKS.md#v030-upgrade-check--2026-09-24) · [Aggregate data / 集計値](benchmarks/context-selection-v0.3.0.json)
 
 ## v0.2.0 — 2026-09-23

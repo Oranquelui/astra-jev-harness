@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "measured_date": "2026-09-24",
+  "harness_version": "0.3.0",
+  "source_commit": "9eb422976c42d66dba4f92596a43b2e89a6897c8",
+  "kind": "single_synthetic_cli_coding_pair",
+  "raw_traces_published": false,
+  "trials_per_arm": 1,
+  "run_order": [
+    "astra_only",
+    "astra_jev"
+  ],
+  "codex_cli_version": "0.153.2",
+  "same_plan_and_verification_command": true,
+  "same_runtime_warnings": true,
+  "same_generated_main_hash": true,
+  "fixture_reference": "context-selection-v0.3.0.json",
+  "focus_paths": [
+    "main.py"
+  ],
+  "verification_cases": [
+    [
+      3,
+      4,
+      12
+    ],
+    [
+      0,
+      9,
+      0
+    ],
+    [
+      7,
+      0,
+      0
+    ],
+    [
+      -2,
+      4,
+      -8
+    ],
+    [
+      -3,
+      -4,
+      12
+    ],
+    [
+      2,
+      1.5,
+      3.0
+    ]
+  ],
+  "verification_scope": "six held-out multiplication cases; no target apply; no claim of real-project quality",
+  "prices": {
+    "checked_date": "2026-09-24",
+    "usd_per_million": {
+      "gpt-6-astra": {
+        "input": 10,
+        "output": 50,
+        "cache_read": 1,
+        "cache_write": 12.5
+      },
+      "jev-1.13.0": {
+        "input": 0.042,
+        "output": 0
+      }
+    },
+    "sources": [
+      "https://developers.openai.com/api/docs/models/gpt-6-astra",
+      "https://docs.typesafe.ai/models"
+    ],
+    "basis": "hypothetical Standard short-context API rates applied to reported Codex CLI and Jev usage; not an invoice or subscription reduction"
+  },
+  "limitations": [
+    "Both arms use v0.3.0; this is not a completed-task v0.2.0 versus v0.3.0 comparison.",
+    "One simple fixture dominated by unrelated prose; relevant file explicitly pinned.",
+    "One trial per arm in fixed order; timings are observations, not repeatable speed estimates.",
+    "Both generations emitted one identical runtime warning; internal Codex prompts are not fully controlled.",
+    "Cache-read and cache-write counts were explicitly reported as zero in both arms; warm-cache behavior is not tested.",
+    "No autonomous tool loop, real-project holdout, Desktop conversation, actual bill or subscription quota measured.",
+    "Extra High uses an isolated export with documented overrides, not the unchanged medium CLI default or a verified Desktop model setting.",
+    "Output-token differences include reasoning and may reflect single-generation variability, not a repeatable Jev effect."
+  ],
+  "isolated_variant_changes": [
+    "CLI reasoning medium -> xhigh and matching metadata",
+    "limit generation loop to one attempt per arm"
+  ],
+  "repository_cli_default_unchanged": "medium",
+  "desktop_effort_setting_verified": false,
+  "astra_only": {
+    "status": "verified",
+    "astra_usage": {
+      "input_tokens": 19198,
+      "cached_input_tokens": 0,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 193,
+      "reasoning_output_tokens": 127
+    },
+    "astra_model": "gpt-6-astra",
+    "reasoning": "xhigh",
+    "astra_calls": 1,
+    "astra_prompt_bytes": 28781,
+    "astra_generation_seconds": 12.416284708015155,
+    "jev_calls": 0,
+    "jev_input_tokens": 0,
+    "jev_output_tokens": 0,
+    "jev_api_seconds": 0,
+    "elapsed_seconds_through_verification": 12.777872124977876,
+    "behavior_checks_passed": 6,
+    "behavior_checks_total": 6,
+    "extra_context_requests": 0,
+    "automatic_retries": 0,
+    "estimated_standard_api_equivalent_usd": "0.20163",
+    "runtime_warning_count": 1,
+    "final_context_paths": [
+      "gardening.md",
+      "main.py"
+    ],
+    "generated_main_sha256": "a299887c8075094b12d211e9f3f2eedadf47d3e9fbdb5d305612186f5ef0ab11"
+  },
+  "astra_jev": {
+    "status": "verified",
+    "astra_usage": {
+      "input_tokens": 14011,
+      "cached_input_tokens": 0,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 126,
+      "reasoning_output_tokens": 64
+    },
+    "astra_model": "gpt-6-astra",
+    "reasoning": "xhigh",
+    "astra_calls": 1,
+    "astra_prompt_bytes": 996,
+    "astra_generation_seconds": 8.857860499992967,
+    "jev_calls": 2,
+    "jev_input_tokens": 6784,
+    "jev_output_tokens": 76,
+    "jev_api_seconds": 2.5527034999686293,
+    "elapsed_seconds_through_verification": 11.851421375002246,
+    "behavior_checks_passed": 6,
+    "behavior_checks_total": 6,
+    "extra_context_requests": 0,
+    "automatic_retries": 0,
+    "estimated_standard_api_equivalent_usd": "0.146694928",
+    "runtime_warning_count": 1,
+    "final_context_paths": [
+      "main.py"
+    ],
+    "generated_main_sha256": "a299887c8075094b12d211e9f3f2eedadf47d3e9fbdb5d305612186f5ef0ab11"
+  },
+  "comparison": {
+    "astra_input_reduction": 0.27018439420773,
+    "astra_input_plus_output_reduction": 0.2709504409262029,
+    "standard_api_equivalent_reduction": "0.2724548529484699697465654912",
+    "elapsed_reduction": 0.07250430595283741
+  }
+}
