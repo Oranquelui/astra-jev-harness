@@ -1,6 +1,6 @@
 # CLI reference
 
-Run from the repository root. Use `python3 cli/main.py --help` for the parser; the root `coding.py` remains a compatibility entrypoint without Keychain supplementation.
+Run from the repository root. Use `python3 "Codex cli/main.py" --help` for the parser; the root `coding.py` remains a compatibility entrypoint without Keychain supplementation.
 
 1. `plan --repo ROOT --task-file TASK --out PLAN`: snapshot eligible tracked files locally, outside the source repository. Above 2 MB or 1,500 eligible files, add reviewed `--focus-file PATH` values and optionally `--scope-max-calls N` (default 4) to bound the local shortlist before Jev. Review retained and `scoped_out` paths in `PLAN.md`; required-file recall is unknown without labels. Preserve existing changes.
 2. `run --plan PLAN --out RUN --mode jev --verify-json '["python3","-B","-m","unittest","discover"]'`: select context, generate full-file replacements using your Codex login, and verify an isolated candidate. Adapt the argument-array verification command to your project. Do not pass a shell string. `auto` skips Jev for a small context; an explicit Jev request should use `jev`.
@@ -12,7 +12,7 @@ Run from the repository root. Use `python3 cli/main.py --help` for the parser; t
 Declare task-authorized changes during planning:
 
 ```sh
-python3 cli/main.py plan --repo /absolute/repo \
+python3 "Codex cli/main.py" plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan \
   --allow-create src/helper.py \
   --allow-create tests/test_helper.py \
@@ -23,7 +23,7 @@ Without flags, existing eligible source files can be edited; existing tests rema
 
 ## Model, verification, and limits
 
-The generator currently uses `gpt-6-astra`, reasoning `medium`, with runtime isolation flags defined in `cli/benchmark.py`. Your Codex account must support that model. The helper does not purchase access or change your saved Codex settings. Compatibility was measured with Codex CLI 0.153.2; check newer versions before relying on the integration.
+The generator currently uses `gpt-6-astra`, reasoning `medium`, with runtime isolation flags defined in `Codex cli/benchmark.py`. Your Codex account must support that model. The helper does not purchase access or change your saved Codex settings. Compatibility was measured with Codex CLI 0.153.2; check newer versions before relying on the integration.
 
 The verification command runs through `codex sandbox --permission-profile :read-only`. Dependencies are not installed automatically. Builds requiring generated files or unavailable dependencies can fail independently of the patch. Do not weaken the sandbox or tests to make a candidate pass.
 

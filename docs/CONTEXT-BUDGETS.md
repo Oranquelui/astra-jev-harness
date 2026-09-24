@@ -15,9 +15,9 @@ The default conservative batch policy is unchanged. A relevant/uncertain range, 
 Inspect repository instructions, status, file names and a focused task first. Let the local planner read bodies outside the conversation. Inspect plan/selection metadata without dumping `plan.json` or `context.json`. Then read only the selected ranges needed for the next implementation step:
 
 ```sh
-python3 desktop/context.py select --plan /absolute/plan --out /absolute/selection \
+python3 "Codex Desktop/context.py" select --plan /absolute/plan --out /absolute/selection \
   --max-calls 4 --mode auto
-python3 desktop/context.py read --selection /absolute/selection --path src/main.py \
+python3 "Codex Desktop/context.py" read --selection /absolute/selection --path src/main.py \
   --start-line 10 --end-line 60
 ```
 

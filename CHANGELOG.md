@@ -1,5 +1,13 @@
 # Changelog / 変更履歴
 
+## v0.3.1 — 2026-09-24
+
+- Rename the workflow directories to `Codex Desktop/` and `Codex cli/`; update launchers, quoted shell commands, and English/Japanese documentation links.
+- Keep existing Python imports and root compatibility scripts working. Re-running `install.py` atomically migrates only this clone's old Desktop Skill symlink; unrelated Skills and existing legacy content are preserved.
+- This is a packaging and naming update, with no new token/cost benchmark or model-setting change. Validation: 122 offline tests passed, including entrypoints from another working directory, Skill-link migration and failure recovery. No live provider calls.
+- 方式別ディレクトリを`Codex Desktop/`と`Codex cli/`に変更し、起動パス・空白を含むコマンド・英日ドキュメントを更新しました。
+- Python importとrootの互換入口は維持。`install.py`再実行で、このcloneを指す旧Skillリンクだけを移行します。他のSkillや既存の旧パス内容は保持します。新たなtoken・費用削減やモデル設定変更はありません。
+
 ## v0.3.0 — 2026-09-24
 
 - New CLI/Desktop plans judge complete source ranges instead of bypassing files over 22 KB. Request budgeting includes serialized questions and metadata; old plans remain reproducible.

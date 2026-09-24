@@ -1,8 +1,8 @@
 # Astra + Jev：CodexエージェントスキルとCLIハーネス
 
-[English](README.md) · [バージョン 0.3.0](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
+[English](README.md) · [バージョン 0.3.1](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
 
-このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。
+このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](Codex%20Desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。
 
 **大きなrepoでは先に候補を絞り、Jevが候補を判断し、Astraがコードを書く。**
 
@@ -11,6 +11,10 @@ Codex CLIとCodex Desktop向けのローカルCoding Harnessです。「公開AP
 **目的：** コードの正しさを保ちながら、Astraの消費tokenと推論全体の費用を減らし、完成までの時間・手戻りも抑えることです。ファイル選別はそのための手段です。
 
 **実験段階です。** **Astra Extra High（`xhigh`）**で合成CLI課題を修正・テストまで比較すると、**Astra入力27.0%減、Jev込みのStandard API単価換算27.2%減**でした。両方式とも同じ6件の確認に成功。所要時間はこの比較では7.3%減でしたが、別の`medium`比較では34.6%増でした。各方式1試行であり、一般的な高速化やDesktopでの効果は示しません。[測定条件と結果](docs/BENCHMARKS.md)。
+
+## v0.3.1：方式が分かるディレクトリ名
+
+実装ディレクトリを[`Codex Desktop/`](Codex%20Desktop/README.md)と[`Codex cli/`](Codex%20cli/README.md)へ変更しました。シェルのコマンドでは空白を含むパスを引用符で囲みます。既存cloneの更新後に`python3 install.py`を再実行すると、このcloneを指す旧Desktop Skillリンクを移行します。他のSkillは保持します。rootの互換スクリプトとPython importは継続して使えます。今回の配布構成変更による新しいtoken・費用削減は主張しません。
 
 ## v0.3.0で何が改善したか
 
@@ -35,7 +39,7 @@ Codex Desktop Skillを更新し、全範囲判定と集計はCLIでも使えま�
 | Jevの役割 | 生成前のコンテキスト選別 | 現在の会話が読むファイルの選別 |
 | 手順 | `plan → run → verify → apply` | `plan → select → check → 会話で実装・テスト` |
 | 対象への書き込み | 検証後の明示的な`apply` | Desktopの通常の編集ツール |
-| 入口 | `python3 cli/main.py` | `python3 desktop/context.py`またはSkill |
+| 入口 | `python3 "Codex cli/main.py"` | `python3 "Codex Desktop/context.py"`またはSkill |
 
 Desktop版はコード生成のために別のCodex CLIを起動しません。どちらもCodexのModelメニューへJevを登録する機能ではありません。
 
@@ -57,7 +61,7 @@ export TYPESAFE_API_KEY="YOUR_OWN_TYPESAFE_API_KEY"
 
 # CLIで生成する場合だけ、必要に応じて自分のCodexアカウントへログイン。
 codex login
-python3 cli/main.py doctor
+python3 "Codex cli/main.py" doctor
 ```
 
 作者のAPIキー、Codexログイン、Cookie、認証ファイルは配布物に含まれません。実キーをGitへ追加しないでください。`doctor`はキーの値を表示せず、外部APIも呼びません。環境変数を優先し、macOSでは設定済みのlogin Keychain（service `astra-jev-harness`、account `TYPESAFE_API_KEY`）も使用できます。installerはそのキーの作成や他人のアカウントの共有を行いません。
@@ -89,16 +93,16 @@ python3 make_demo.py "$DEMO_ROOT/repo"
 printf '%s\n' 'page_itemsを修正。ページ番号は1始まり。pageと明示的sizeは1以上へ補正し、sizeがNoneのときだけDEFAULT_PAGE_SIZEを使う。APIとテストを保持する。' > "$DEMO_ROOT/task.txt"
 
 # ローカル確認のみ。外部送信前にPLAN.mdを読む。
-python3 cli/main.py plan --repo "$DEMO_ROOT/repo" \
+python3 "Codex cli/main.py" plan --repo "$DEMO_ROOT/repo" \
   --task-file "$DEMO_ROOT/task.txt" --out "$DEMO_ROOT/plan"
 
 # 外部プロバイダー利用：最大Jev 24回、Astra生成2回。
-python3 cli/main.py run --plan "$DEMO_ROOT/plan" \
+python3 "Codex cli/main.py" run --plan "$DEMO_ROOT/plan" \
   --out "$DEMO_ROOT/run" --mode jev \
   --verify-json '["python3", "-B", "-m", "unittest", "discover"]'
 
 # REPORT.md、changes.diff、検証出力を確認してから適用。
-python3 cli/main.py apply --run "$DEMO_ROOT/run"
+python3 "Codex cli/main.py" apply --run "$DEMO_ROOT/run"
 ```
 
 `run`は対象外に候補を作ります。`apply`は検証済みで改変のない成果物だけを適用し、コミットしません。`verify --run ...`はモデルを再呼び出さず検証できます。新規ファイルは`plan --allow-create path`、既存テスト更新は`--allow-test-edit path`で明示します。[CLIの詳細](docs/CLI.md)。
@@ -115,12 +119,12 @@ python3 cli/main.py apply --run "$DEMO_ROOT/run"
 - **失敗の記録**：サービスの自動再試行はありません。CLIは全候補を含むAstraプロンプトをシリアライズして500,000バイト上限をJev呼び出し前に確認します。Desktopは試行/完了を保存し、同一出力先の再利用を拒否します。応答のない試行も課金される可能性があります。
 
 ```sh
-python3 desktop/context.py plan --repo /absolute/repo \
+python3 "Codex Desktop/context.py" plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan
-python3 desktop/context.py select --plan /absolute/plan \
+python3 "Codex Desktop/context.py" select --plan /absolute/plan \
   --out /absolute/selection --max-calls 4 --mode auto
-python3 desktop/context.py check --selection /absolute/selection
-python3 desktop/context.py compare --selection /absolute/selection \
+python3 "Codex Desktop/context.py" check --selection /absolute/selection
+python3 "Codex Desktop/context.py" compare --selection /absolute/selection \
   --required-file src/main.py
 ```
 
@@ -133,13 +137,13 @@ python3 desktop/context.py compare --selection /absolute/selection \
 課題に必要と分かっている適格ファイルは、繰り返し指定できる`--focus-file`で固定します。`--scope-max-calls`は候補全体の**計画上の**Jevリクエスト数の上限です（既定4回、範囲1〜24回）。後の`select --max-calls`による実行上限とは別です。未追跡ファイルは引き続き`--include-file`が必要です。`--focus-file`でも適格性や1ファイル100 KBの上限は迂回できません。
 
 ```sh
-python3 desktop/context.py plan --repo /absolute/repo \
+python3 "Codex Desktop/context.py" plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan \
   --focus-file src/pagination.py --focus-file tests/test_pagination.py \
   --scope-max-calls 4
 ```
 
-同じplan用の2つのフラグを`cli/main.py plan`でも使えます。送信前に`PLAN.md`を確認してください。元の適格ファイル数/バイト数、絞り込み対象外のパス/バイト数、予定Jev呼び出し数を示します。`plan.json`の`scope`が集計、`scoped_out`が対象外の適格ファイルの情報です。**これらのファイルをJevは判定していません**。保護規則で除かれた`excluded`や、Jevが無関係と判定したファイルとも異なります。AGENTS.md・主要設定・解決できる依存は候補に残します。この語の一致は翻訳しないため、ASCIIのパスや識別子を含まない日本語だけの課題では`--focus-file`が必要になる場合があります。課題とファイルの一致がなく**必須パスの明示もない場合**、または必須ファイルが上限に収まらない場合はplanが停止するため、課題またはfocus pathを具体化してください。必要ファイルの保持率とAstraトークンへの効果は、独立した測定なしには分かりません。[設計とTypeSafe公式資料](docs/DESIGN.md)。
+同じplan用の2つのフラグを`"Codex cli/main.py" plan`でも使えます。送信前に`PLAN.md`を確認してください。元の適格ファイル数/バイト数、絞り込み対象外のパス/バイト数、予定Jev呼び出し数を示します。`plan.json`の`scope`が集計、`scoped_out`が対象外の適格ファイルの情報です。**これらのファイルをJevは判定していません**。保護規則で除かれた`excluded`や、Jevが無関係と判定したファイルとも異なります。AGENTS.md・主要設定・解決できる依存は候補に残します。この語の一致は翻訳しないため、ASCIIのパスや識別子を含まない日本語だけの課題では`--focus-file`が必要になる場合があります。課題とファイルの一致がなく**必須パスの明示もない場合**、または必須ファイルが上限に収まらない場合はplanが停止するため、課題またはfocus pathを具体化してください。必要ファイルの保持率とAstraトークンへの効果は、独立した測定なしには分かりません。[設計とTypeSafe公式資料](docs/DESIGN.md)。
 
 ## トークンはどれだけ減るか
 
@@ -210,7 +214,7 @@ flowchart LR
   F --> E[現在の会話で実装・テスト]
 ```
 
-`shared/`はTypeSafe通信・snapshot・選別・資格情報の取得、`cli/`は生成・候補検証・適用、`desktop/`はcontext受け渡しとSkillを担当します。rootスクリプトは互換入口です。JevはNoulのyes/no形式で関連性を判断し、コードは生成しません。回数・パス等の制約はコードが管理します。
+`shared/`はTypeSafe通信・snapshot・選別・資格情報の取得、`Codex cli/`は生成・候補検証・適用、`Codex Desktop/`はcontext受け渡しとSkillを担当します。rootスクリプトは互換入口です。JevはNoulのyes/no形式で関連性を判断し、コードは生成しません。回数・パス等の制約はコードが管理します。
 
 ## 外部へ送信される情報
 

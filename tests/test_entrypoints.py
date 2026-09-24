@@ -12,8 +12,10 @@ ROOT = Path(__file__).resolve().parent.parent
 class EntrypointTests(unittest.TestCase):
     def test_cli_and_legacy_entrypoints_from_another_directory(self):
         with tempfile.TemporaryDirectory() as cwd:
-            for script, args in [('cli/coding.py', ['plan', '--help']), ('coding.py', ['plan', '--help']),
-                                 ('cli/benchmark.py', ['--help']), ('harness.py', ['--help'])]:
+            for script, args in [('Codex cli/main.py', ['plan', '--help']),
+                                 ('Codex cli/coding.py', ['plan', '--help']), ('coding.py', ['plan', '--help']),
+                                 ('Codex cli/benchmark.py', ['--help']), ('harness.py', ['--help']),
+                                 ('Codex Desktop/context.py', ['plan', '--help'])]:
                 with self.subTest(script=script):
                     result = subprocess.run([sys.executable, str(ROOT / script), *args], cwd=cwd,
                                             text=True, capture_output=True)

@@ -4,24 +4,24 @@
 
 ## 基本の流れ
 
-CLIの入口は `python3 cli/main.py` です。`run`時、環境変数が未設定ならmacOSキーチェーン（service `astra-jev-harness` / account `TYPESAFE_API_KEY`）から補います。`plan` / `verify` / `apply` / ヘルプと明示的な`--mode astra`ではキーチェーンを読みません。`doctor`でキーの有無・取得元だけを確認できます。`keychain_timeout` / `keychain_unavailable`はキーの不在を意味しません。
+CLIの入口は `python3 "Codex cli/main.py"` です。`run`時、環境変数が未設定ならmacOSキーチェーン（service `astra-jev-harness` / account `TYPESAFE_API_KEY`）から補います。`plan` / `verify` / `apply` / ヘルプと明示的な`--mode astra`ではキーチェーンを読みません。`doctor`でキーの有無・取得元だけを確認できます。`keychain_timeout` / `keychain_unavailable`はキーの不在を意味しません。
 
-Desktop版は別方式です。[Desktopの説明](../desktop/README.md)を参照してください。
+Desktop版は別方式です。[Desktopの説明](../Codex%20Desktop/README.md)を参照してください。
 
 リポジトリルートで実行します。必要なのはPython 3.10以降、Git、ログイン済みCodex CLIです。現在の実動作検証環境はmacOS・Codex CLI 0.153.2です。
 
 ```sh
 # task.txtに修正課題を書き、ローカルで対象を確認。API呼び出しなし。
-python3 cli/main.py plan --repo /absolute/path/to/repo \
+python3 "Codex cli/main.py" plan --repo /absolute/path/to/repo \
   --task-file /absolute/path/to/task.txt --out /absolute/path/to/plan
 
 # PLAN.mdの対象を確認して実行。この段階で対象コードをプロバイダーに送ります。
-python3 cli/main.py run --plan /absolute/path/to/plan \
+python3 "Codex cli/main.py" run --plan /absolute/path/to/plan \
   --out /absolute/path/to/run --mode auto \
   --verify-json '["python3", "-B", "-m", "unittest", "discover"]'
 
 # changes.diffと検証結果を確認後、元リポジトリへ適用。
-python3 cli/main.py apply --run /absolute/path/to/run
+python3 "Codex cli/main.py" apply --run /absolute/path/to/run
 ```
 
 `--verify-json`は対象プロジェクトに合ったテストコマンドへ変更してください。コマンドは引数配列で受け取り、shell文字列として実行しません。モデルは検証コマンドを決定しません。
@@ -33,7 +33,7 @@ python3 cli/main.py apply --run /absolute/path/to/run
 課題の重要なファイルが分かっている場合は、繰り返し指定できる`--focus-file`で固定します。未追跡ファイルは別途`--include-file`で明示してください。固定指定でも秘密情報・非対応形式・100 KBの単一ファイル上限を迂回できません。
 
 ```sh
-python3 cli/main.py plan --repo /absolute/path/to/repo \
+python3 "Codex cli/main.py" plan --repo /absolute/path/to/repo \
   --task-file /absolute/path/to/task.txt --out /absolute/path/to/plan \
   --focus-file src/pagination.py --focus-file tests/test_pagination.py \
   --scope-max-calls 4
@@ -46,7 +46,7 @@ python3 cli/main.py plan --repo /absolute/path/to/repo \
 追加先と更新するテストは、plan時にrepoルートからの相対パスで指定します。各オプションは繰り返し指定できます。
 
 ```sh
-python3 cli/main.py plan --repo /absolute/path/to/repo \
+python3 "Codex cli/main.py" plan --repo /absolute/path/to/repo \
   --task-file /absolute/path/to/task.txt --out /absolute/path/to/plan \
   --allow-create src/helper.py \
   --allow-create tests/test_helper.py \
@@ -84,7 +84,7 @@ Astraがplan内の不足ファイルを指定した場合は、同じスナッ�
 テスト環境の問題を直した後は、モデルを再呼び出さず検証だけを再実行できます。
 
 ```sh
-python3 cli/main.py verify --run /absolute/path/to/run
+python3 "Codex cli/main.py" verify --run /absolute/path/to/run
 ```
 
 元ファイル、Git状態、計画、候補コード（追加ファイルを含む）が変わっていれば適用を拒否します。新規ファイルは宛先が存在しない場合だけ原子的に追加し、適用中に現れたファイルを上書きしません。

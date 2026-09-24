@@ -1,8 +1,8 @@
 # Astra + Jev: Codex Agent Skill and CLI Harness
 
-[日本語](README-ja.md) · [Version 0.3.0](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
+[日本語](README-ja.md) · [Version 0.3.1](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
 
-This repository provides the **[`astra-jev-coding` Codex Agent Skill](desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately.
+This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20Desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately.
 
 Narrow large repositories locally, let **Jev judge the bounded candidates**, then let **Astra write the code**.
 
@@ -11,6 +11,10 @@ A local coding harness for Codex CLI and Codex Desktop. Give it a task such as �
 **Goal:** reduce Astra token consumption and combined inference cost while preserving coding correctness and avoiding extra turnaround time. File selection is a means to that goal.
 
 **Experimental.** One synthetic CLI coding task at **Astra Extra High (`xhigh`)** used **27.0% fewer Astra input tokens** and **27.2% less at equivalent Standard API rates**, including Jev. Both modes passed the same six checks. Elapsed time was 7.3% shorter in this pair, but 34.6% longer in a separate `medium` pair. Each is one trial per mode, not a general speedup or Desktop result. [Measurements and limits](docs/BENCHMARKS.md).
+
+## v0.3.1: explicit workflow directories
+
+The implementation directories are now [`Codex Desktop/`](Codex%20Desktop/README.md) and [`Codex cli/`](Codex%20cli/README.md). Quote paths with spaces in shell commands. After updating an existing clone, rerun `python3 install.py` to migrate this clone's old Desktop Skill symlink. Other installed Skills are preserved. Root compatibility scripts and Python imports remain available. This packaging update makes no new token or cost claim.
 
 ## What improved in v0.3.0?
 
@@ -35,7 +39,7 @@ Select original evaluation excerpts with source hashes and line numbers, retain 
 | What does Jev do? | Selects context before generation | Selects files for the current conversation to read |
 | Workflow | `plan → run → verify → apply` | `plan → select → check → implement/test in the conversation` |
 | Target writes | Explicit `apply` after verification | Your normal Desktop editing tools |
-| Entrypoint | `python3 cli/main.py` | `python3 desktop/context.py` or the Skill |
+| Entrypoint | `python3 "Codex cli/main.py"` | `python3 "Codex Desktop/context.py"` or the Skill |
 
 Desktop does **not** spawn another Codex CLI to generate code. Neither workflow registers Jev as a model in Codex's Model menu.
 
@@ -57,7 +61,7 @@ export TYPESAFE_API_KEY="YOUR_OWN_TYPESAFE_API_KEY"
 
 # CLI generation only: log in to your own account if needed.
 codex login
-python3 cli/main.py doctor
+python3 "Codex cli/main.py" doctor
 ```
 
 No maintainer API key, Codex login, session cookie, or authentication file is included. Never commit a real key. `doctor` reports availability, not the value; it does not call an API. Existing environment values take precedence. On macOS, an already-configured login Keychain item with service `astra-jev-harness` and account `TYPESAFE_API_KEY` can be used instead. The installer does not create that item or share anyone else's account.
@@ -89,16 +93,16 @@ python3 make_demo.py "$DEMO_ROOT/repo"
 printf '%s\n' 'Fix page_items: page numbers start at 1. Clamp page and explicit size to at least 1; use DEFAULT_PAGE_SIZE only when size is None. Preserve the API and tests.' > "$DEMO_ROOT/task.txt"
 
 # Local inspection only. Review PLAN.md before sending source to a provider.
-python3 cli/main.py plan --repo "$DEMO_ROOT/repo" \
+python3 "Codex cli/main.py" plan --repo "$DEMO_ROOT/repo" \
   --task-file "$DEMO_ROOT/task.txt" --out "$DEMO_ROOT/plan"
 
 # Paid/provider usage: at most 24 Jev requests and 2 Astra generations.
-python3 cli/main.py run --plan "$DEMO_ROOT/plan" \
+python3 "Codex cli/main.py" run --plan "$DEMO_ROOT/plan" \
   --out "$DEMO_ROOT/run" --mode jev \
   --verify-json '["python3", "-B", "-m", "unittest", "discover"]'
 
 # Review REPORT.md, changes.diff, and verification output first.
-python3 cli/main.py apply --run "$DEMO_ROOT/run"
+python3 "Codex cli/main.py" apply --run "$DEMO_ROOT/run"
 ```
 
 `run` writes a candidate outside the target. `apply` accepts only verified, unchanged artifacts and leaves changes uncommitted. `verify --run ...` reruns verification without another model call. New files and existing test edits require explicit plan flags: `--allow-create path` and `--allow-test-edit path`. [CLI details](docs/CLI.md).
@@ -115,12 +119,12 @@ Select before loading bodies into the conversation, then use `read --selection /
 - **Explicit failures.** No automatic service retries. CLI checks the serialized worst-case Astra prompt against its 500,000-byte limit before any Jev call. Desktop records attempted and completed requests and refuses to reuse an output directory. Failed requests may still be billable.
 
 ```sh
-python3 desktop/context.py plan --repo /absolute/repo \
+python3 "Codex Desktop/context.py" plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan
-python3 desktop/context.py select --plan /absolute/plan \
+python3 "Codex Desktop/context.py" select --plan /absolute/plan \
   --out /absolute/selection --max-calls 4 --mode auto
-python3 desktop/context.py check --selection /absolute/selection
-python3 desktop/context.py compare --selection /absolute/selection \
+python3 "Codex Desktop/context.py" check --selection /absolute/selection
+python3 "Codex Desktop/context.py" compare --selection /absolute/selection \
   --required-file src/main.py
 ```
 
@@ -133,13 +137,13 @@ When eligible files exceed **2,000,000 bytes, 1,500 files, or the planned reques
 Use repeated `--focus-file` paths for eligible files you know the task needs. `--scope-max-calls` caps the **planned** Jev requests for the candidate scope (default 4, range 1–24); the later `select --max-calls` execution cap remains separate. Untracked files still require `--include-file`. A focus path cannot bypass eligibility or the 100 KB per-file limit.
 
 ```sh
-python3 desktop/context.py plan --repo /absolute/repo \
+python3 "Codex Desktop/context.py" plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan \
   --focus-file src/pagination.py --focus-file tests/test_pagination.py \
   --scope-max-calls 4
 ```
 
-The same two planning flags are available in `cli/main.py plan`. Review `PLAN.md` before sending code: it reports the original eligible count/bytes, the scoped-out paths/bytes, and planned Jev calls. `plan.json` stores the totals under `scope` and omitted eligible file metadata under `scoped_out`. These files were **not judged by Jev**; they differ from protected/ineligible `excluded` files and Jev-rejected files. Instructions, key configuration, and resolvable dependencies remain in scope. The lexical stage does not translate: a Japanese-only task without an ASCII path or identifier may need `--focus-file`. If no task/file match is found **and no required path is supplied**, or mandatory files cannot fit, planning fails and asks for a more specific task or focus path. Required-file recall and Astra token effects remain unknown until independently measured. [Design and official TypeSafe references](docs/DESIGN.md).
+The same two planning flags are available in `"Codex cli/main.py" plan`. Review `PLAN.md` before sending code: it reports the original eligible count/bytes, the scoped-out paths/bytes, and planned Jev calls. `plan.json` stores the totals under `scope` and omitted eligible file metadata under `scoped_out`. These files were **not judged by Jev**; they differ from protected/ineligible `excluded` files and Jev-rejected files. Instructions, key configuration, and resolvable dependencies remain in scope. The lexical stage does not translate: a Japanese-only task without an ASCII path or identifier may need `--focus-file`. If no task/file match is found **and no required path is supplied**, or mandatory files cannot fit, planning fails and asks for a more specific task or focus path. Required-file recall and Astra token effects remain unknown until independently measured. [Design and official TypeSafe references](docs/DESIGN.md).
 
 ## How much does it save?
 
@@ -210,7 +214,7 @@ flowchart LR
   F --> E[Current conversation edits and tests]
 ```
 
-`shared/` owns TypeSafe transport, snapshots, selection, and credential lookup. `cli/` owns generation, candidate verification, and apply. `desktop/` owns the context handoff and Skill. Root scripts remain compatibility entrypoints. Jev answers Noul yes/no relevance questions; it does not generate code. Code enforces limits and paths.
+`shared/` owns TypeSafe transport, snapshots, selection, and credential lookup. `Codex cli/` owns generation, candidate verification, and apply. `Codex Desktop/` owns the context handoff and Skill. Root scripts remain compatibility entrypoints. Jev answers Noul yes/no relevance questions; it does not generate code. Code enforces limits and paths.
 
 ## What leaves your machine
 
