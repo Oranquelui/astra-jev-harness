@@ -96,3 +96,13 @@ Reviewed 2026-09-23. No headline provider benchmark is a measured harness saving
 One live Jev 1.13.0 request on fictional code-debugging evidence succeeded: 971 input / 112 output tokens, approximately 0.34 seconds for the API call. The required failure excerpt and pinned status record were retained. An unrelated excerpt was also retained because its review probability was 0.30; the conservative threshold kept it. Original excerpt bytes remained 444 → 444 (0% reduction). This is a functionality check, not an accuracy or Astra-token-saving benchmark. The identical second selection used the validated cache with **zero additional provider calls**. No Astra child generation or real-project evaluation API was run.
 
 架空資料の実Jev検証は1回成功し、再利用は追加API 0回でした。ただし本文削減は0%で、Astraのtoken節約は未実証です。無関係な資料の誤保持も含めて、次の評価セットで閾値・質問を検証する必要があります。
+
+## Cache accounting update / キャッシュ計測の更新
+
+`measure.py` now records ordinary input, provider cache reads/writes and missing cache details separately. `--prices` optionally supplies exact-model USD-per-million rates; incomplete usage cannot produce a complete cost estimate. Jev response-cache reuse is not an OpenAI prompt-cache hit. [Usage, schema and limitations / 使い方と制限](CONTEXT-BUDGETS.md).
+
+## Source-range smoke check — 2026-09-24
+
+Two live Jev 1.13.0 requests judged all four ranges in a synthetic two-file repository, including a 27,278-byte unrelated file that exceeded the old batch allowance. The required 75-byte implementation file was retained; the unrelated file was omitted. Recorded usage was 6,784 input / 76 output tokens, with 2.70 seconds for selection. Repeating the identical selection made zero additional provider calls. No real project was modified and no Astra child generation ran. This checks coverage, response handling and reuse; it does not measure Astra token savings or coding accuracy on real tasks.
+
+合成repoの実Jev検証は2回・全4範囲の判定に成功しました。旧22 KBを超えるファイルも判定され、必要ファイルを保持しました。使用量は入力6,784 / 出力76 token、同一入力の再利用は追加呼び出し0回です。実作業でのAstra節約率・品質の評価は別途必要です。

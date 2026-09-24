@@ -135,7 +135,8 @@ class StagedScopeTests(unittest.TestCase):
         self.make_repo(noise_count=1)
         plan = rc.snapshot(self.repo, 'Fix checkout', self.next_plan(),
                            focus_paths=['src/checkout.py'])
-        scores = {path: (.95 if path == 'noise/000.py' else .01) for path in plan['files']}
+        from shared.context_chunks import units
+        scores = {key: (.95 if u['path'] == 'noise/000.py' else .01) for key, u in units(plan).items()}
         result = rc.resolve_selection(plan, [{'probabilities': scores}], policy='per-file')
         self.assertIn('src/checkout.py', result['paths'])
         self.assertIn('src/price.py', result['paths'])
@@ -164,12 +165,12 @@ class StagedScopeTests(unittest.TestCase):
         self.make_repo()
         escape_paths = [f'src/escaped_{index}.py' for index in range(4)]
         for name in escape_paths:
-            (self.repo / name).write_text('\\' * 75_000)
+            (self.repo / name).write_text('\\' * 65_000)
         for args in (('add', '-A'), ('commit', '-qm', 'add escaped sources')):
             subprocess.run(['git', '-C', str(self.repo), *args], check=True, capture_output=True)
         plan_dir = self.next_plan()
         plan = rc.snapshot(self.repo, 'Fix escaped sources', plan_dir,
-                           focus_paths=escape_paths, scope_max_calls=4, scope_max_bytes=350_000)
+                           focus_paths=escape_paths, scope_max_calls=24, scope_max_bytes=350_000)
         self.assertLessEqual(sum(item['bytes'] for item in plan['files'].values()), 350_000)
         self.assertGreater(sum(len(json.dumps(record['content']).encode()) for record in plan['files'].values()),
                            500_000)

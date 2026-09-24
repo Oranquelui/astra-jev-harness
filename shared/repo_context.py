@@ -9,6 +9,7 @@ import subprocess
 
 from shared.jev import (ProtocolError, call_jev, jev_request, read_cache, write_cache, request_jev, select_context, request_hash)
 from shared.dependency_paths import local_candidates, variants
+from shared import context_chunks as chunks
 
 EXTENSIONS = {'.py', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.json', '.jsonc', '.toml', '.yaml', '.yml', '.md', '.txt', '.css', '.html', '.sql'}
 EXCLUDED_DIRS = {'.git', '.venv', 'venv', 'node_modules', 'dist', 'build', '.next', '__pycache__'}
@@ -140,7 +141,7 @@ def scoped_shortlist(files, task, includes, focus, test_edits, max_calls, max_by
     def bounded(paths):
         chosen = {p: files[p] for p in sorted(paths)}
         return (len(chosen) <= 1500 and sum(r['bytes'] for r in chosen.values()) <= max_bytes
-                and len(jev_batches({'files': chosen})) <= max_calls)
+                and len(jev_batches({'files': chosen, 'task': task, 'context_format': chunks.FORMAT})) <= max_calls)
 
     selected = set(dependencies(contents, required))
     if not bounded(selected):
@@ -240,7 +241,8 @@ def snapshot(repo, task, out, create_paths=None, test_edit_paths=None, include_p
     eligible_count, eligible_bytes = len(files), sum(f['bytes'] for f in files.values())
     all_files = files
     scoped_out, scope = {}, None
-    if eligible_bytes > 2000000 or eligible_count > 1500:
+    if (eligible_bytes > 2000000 or eligible_count > 1500
+            or len(jev_batches({'files': files, 'task': task, 'context_format': chunks.FORMAT})) > scope_max_calls):
         kept = scoped_shortlist(files, task, included, focused, test_edit_paths or [],
                                 scope_max_calls, scope_max_bytes)
         scoped_out = {p: {key: r[key] for key in ('sha256', 'bytes', 'mode')}
@@ -250,14 +252,14 @@ def snapshot(repo, task, out, create_paths=None, test_edit_paths=None, include_p
                  'eligible_bytes': eligible_bytes, 'scoped_out_files': len(scoped_out),
                  'scoped_out_bytes': sum(r['bytes'] for r in scoped_out.values()),
                  'max_calls': scope_max_calls, 'max_bytes': scope_max_bytes,
-                 'planned_calls': len(jev_batches({'files': files})),
+                 'planned_calls': len(jev_batches({'files': files, 'task': task, 'context_format': chunks.FORMAT})),
                  'focus_paths': focused}
     if git(repo, 'status', '--porcelain=v1', '-z') != before:
         raise ProtocolError('Repository status changed during snapshot; try again')
     for rel, record in all_files.items():
         if digest(safe_path(repo, rel).read_bytes()) != record['sha256']:
             raise ProtocolError('Repository content changed during snapshot; try again')
-    manifest = {'version': 1, 'repo': str(repo), 'head': git(repo, 'rev-parse', 'HEAD').decode().strip(),
+    manifest = {'version': 1, 'context_format': chunks.FORMAT, 'repo': str(repo), 'head': git(repo, 'rev-parse', 'HEAD').decode().strip(),
                 'branch': git(repo, 'branch', '--show-current').decode().strip(),
                 'status_sha256': digest(before), 'task': task, 'files': files, 'excluded': excluded,
                 'explicit_includes': included}
@@ -267,6 +269,7 @@ def snapshot(repo, task, out, create_paths=None, test_edit_paths=None, include_p
         manifest.update(scoped_out=scoped_out, scope=scope)
     if create_paths or test_edit_paths:
         manifest.update(version=2, create_paths=create_paths or [], test_edit_paths=test_edit_paths or [])
+    manifest['inference'] = chunks.summary(manifest)
     validate_change_scope(manifest)
     check_creation_destinations(manifest)
     out.mkdir(parents=True)
@@ -278,6 +281,8 @@ def snapshot(repo, task, out, create_paths=None, test_edit_paths=None, include_p
                 f"{len(scoped_out)} files / {scope['scoped_out_bytes']} bytes scoped out; "
                 f"{scope['planned_calls']} planned Jev calls.",
                 'Scoped-out files were not judged by Jev. Required-file recall is unknown.', ''] if scope else []),
+             f"Jev plan: {manifest['inference']['source_fragments']} complete-coverage source ranges / {manifest['inference']['planned_calls']} calls.",
+             'Budgets estimate serialized UTF-8 bytes plus reserve, not exact Jev tokens.', '',
              '## Task', task, '', '## Permitted new files', *['- ' + p for p in manifest.get('create_paths', [])],
              '', '## Permitted existing test edits', *['- ' + p for p in manifest.get('test_edit_paths', [])],
              '', 'Existing source files remain editable; other tests and instructions are read-only.',
@@ -291,6 +296,8 @@ def snapshot(repo, task, out, create_paths=None, test_edit_paths=None, include_p
 
 def load_plan(path):
     plan = json.loads((Path(path) / 'plan.json').read_text())
+    if plan.get('context_format') not in (None, chunks.FORMAT):
+        raise ProtocolError('Unsupported context format')
     if plan.get('version') not in (1, 2):
         raise ProtocolError('Unsupported plan version')
     if plan['version'] == 1 and (plan.get('create_paths') or plan.get('test_edit_paths')):
@@ -394,7 +401,15 @@ def dependencies(files, selected):
     return sorted(keep)
 
 
+def selection_case(plan, batch):
+    if plan.get('context_format') == chunks.FORMAT:
+        return chunks.case(plan, batch)
+    return {'task': plan['task'], 'files': batch}
+
+
 def jev_batches(plan):
+    if plan.get('context_format') == chunks.FORMAT:
+        return chunks.batches(plan)
     files = {p: r['content'] for p, r in plan['files'].items()}
     # Batch full file contents. No silent excerpting or token-limit truncation.
     batches, batch, count = [], {}, 0
@@ -425,6 +440,7 @@ def resolve_selection(plan, calls, policy='batch'):
     if policy not in SELECTION_POLICIES:
         raise ProtocolError('Unknown selection policy')
     files = {p: r['content'] for p, r in plan['files'].items()}
+    catalog = chunks.units(plan) if plan.get('context_format') == chunks.FORMAT else {p: {'path': p} for p in files}
     probabilities, reasons = {}, {p: [] for p in files}
     chosen = set()
     for call in calls:
@@ -432,19 +448,21 @@ def resolve_selection(plan, calls, policy='batch'):
         if not isinstance(scores, dict) or not scores:
             raise ProtocolError('Invalid recorded probability map')
         for path, value in scores.items():
-            if (path not in files or path in probabilities or type(value) not in (int, float)
+            if (path not in catalog or path in probabilities or type(value) not in (int, float)
                     or not math.isfinite(value) or not 0 <= value <= 1):
                 raise ProtocolError('Invalid, duplicate or unknown recorded probability')
         probabilities.update(scores)
         uncertain_batch = any(.2 < v < .8 for v in scores.values())
-        for path, value in scores.items():
+        for unit_id, value in scores.items():
+            path = catalog[unit_id]['path']
             if value > .2:
                 chosen.add(path)
                 reasons[path].append('relevant' if value >= .8 else 'uncertain')
             elif policy == 'batch' and uncertain_batch:
                 chosen.add(path)
                 reasons[path].append('batch_uncertainty')
-    unjudged = sorted(set(files) - set(probabilities))
+    unjudged_units = set(catalog) - set(probabilities)
+    unjudged = sorted({catalog[key]['path'] for key in unjudged_units})
     for path in unjudged:
         chosen.add(path)
         reasons[path].append('unjudged')
@@ -460,19 +478,30 @@ def resolve_selection(plan, calls, policy='batch'):
         reasons[path].append('guidance_or_dependency')
     kept = set(selected)
     decisions = {}
+    by_path = {path: [key for key, unit in catalog.items() if unit['path'] == path] for path in files}
     for path in files:
-        value = probabilities.get(path)
+        keys = by_path[path]
+        scores = [probabilities[key] for key in keys if key in probabilities]
+        value = max(scores) if scores and path not in unjudged else None
         judgment = ('unjudged' if value is None else 'relevant' if value >= .8
                     else 'irrelevant' if value <= .2 else 'uncertain')
-        decisions[path] = {'probability': value, 'judgment': judgment, 'kept': path in kept,
-                           'reasons': reasons[path] or ['confidently_irrelevant']}
+        decisions[path] = {'probability': value if len(keys) == 1 else None, 'judgment': judgment, 'kept': path in kept,
+                           'reasons': sorted(set(reasons[path])) or ['confidently_irrelevant']}
+        if len(keys) > 1:
+            decisions[path].update(fragment_ids=keys, max_fragment_probability=max(scores) if scores else None,
+                                   fully_judged=path not in unjudged)
     before = sum(len(s.encode()) for s in files.values())
     after = sum(len(files[p].encode()) for p in selected)
     prefiltered = plan.get('scoped_out', {})
     prefiltered_bytes = sum(r['bytes'] for r in prefiltered.values())
     return {'paths': selected, 'policy': policy, 'decisions': decisions, 'unjudged_paths': unjudged,
+            'fragment_decisions': {key: {**{k: v for k, v in unit.items() if k != 'text'},
+                                        'probability': probabilities.get(key)} for key, unit in catalog.items()},
             'metrics': {'candidate_files': len(files), 'selected_files': len(selected),
-                        'judged_files': len(probabilities), 'unjudged_files': len(unjudged),
+                        'judged_files': len(files) - len(unjudged), 'unjudged_files': len(unjudged),
+                        'candidate_fragments': len(catalog), 'judged_fragments': len(probabilities),
+                        'unjudged_fragments': len(unjudged_units),
+                        'unjudged_bytes': sum(len(files[p].encode()) for p in unjudged),
                         'excluded_files': len(plan.get('excluded', {})), 'candidate_bytes': before,
                         'selected_bytes': after, 'omitted_bytes': before - after,
                         'retained_byte_ratio': after / before if before else None,
@@ -481,17 +510,23 @@ def resolve_selection(plan, calls, policy='batch'):
                         'eligible_bytes': before + prefiltered_bytes}}
 
 
+def selection_route(plan, mode):
+    if mode not in ('auto', 'astra', 'jev'):
+        raise ProtocolError('Unknown selection mode')
+    size = sum(len(r['content'].encode()) for r in plan['files'].values())
+    return 'astra' if mode == 'astra' or (mode == 'auto' and size < 12000) else 'jev'
+
+
 def select(plan, mode='auto', on_call=None, max_calls=24, on_attempt=None, policy='batch', cache_dir=None):
     if policy not in SELECTION_POLICIES:
         raise ProtocolError('Unknown selection policy')
     files = {p: r['content'] for p, r in plan['files'].items()}
-    size = sum(len(s.encode()) for s in files.values())
-    if mode == 'astra' or (mode == 'auto' and size < 12000):
+    if selection_route(plan, mode) == 'astra':
         return {**resolve_selection(plan, [], policy), 'route': 'astra', 'reason': 'explicit_or_small_context', 'jev_calls': []}
     batches = jev_batches(plan)
     if type(max_calls) is not int or not 1 <= max_calls <= 24:
         raise ProtocolError('Jev max_calls must be between 1 and 24')
-    needed = sum(read_cache(jev_request({'task': plan['task'], 'files': batch}), cache_dir) is None
+    needed = sum(read_cache(jev_request(selection_case(plan, batch)), cache_dir) is None
                  for batch in batches)
     if needed > max_calls:
         raise ProtocolError(f'Jev request budget exceeds {max_calls} calls; narrow the plan')
@@ -499,7 +534,7 @@ def select(plan, mode='auto', on_call=None, max_calls=24, on_attempt=None, polic
         raise ProtocolError('Cache must be outside the source repository')
     calls = []
     for batch in batches:
-        case = {'task': plan['task'], 'files': batch}
+        case = selection_case(plan, batch)
         payload = jev_request(case)
         cached = read_cache(payload, cache_dir)
         if cached is not None:
