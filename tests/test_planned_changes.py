@@ -13,7 +13,12 @@ from tests import test_coding
 
 
 class PlannedChangesTests(unittest.TestCase):
-    setUp = test_coding.RepositoryTests.setUp
+    def setUp(self):
+        test_coding.RepositoryTests.setUp(self)
+        config = patch.object(coding, 'read_model_settings', return_value={
+            'model': 'fixture-model', 'reasoning': 'high'})
+        config.start()
+        self.addCleanup(config.stop)
 
     def make_plan(self, create=(), test_edits=()):
         return rc.snapshot(self.repo, 'Add a helper and its tests', self.plan_dir,

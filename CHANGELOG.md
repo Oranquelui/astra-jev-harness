@@ -1,5 +1,10 @@
 # Changelog / 変更履歴
 
+## Unreleased
+
+- CLI generation now resolves the configured model/effort through Codex before Jev selection and forwards only those settings into the isolated generation process. Missing settings use Codex defaults; configuration errors and unsupported custom providers/profiles fail closed. Requested settings are distinct from unknown serving-model identity, preventing cost attribution to a hardcoded Astra model. Historical benchmark settings/results are unchanged.
+- CLI生成のモデル・推論強度をCodex設定から継承します。設定はJev選別前に確認し、取得失敗・未対応の独自プロバイダー/profileでは停止します。実応答モデルを確認できない場合の費用は不明とし、過去の測定結果と区別します。
+
 ## v0.4.0 — 2026-09-24
 
 - Add the `claude-jev-coding` Claude Code Skill (`Claude Code/`) and `install.py --target claude-code` (default `~/.claude/skills`; `--skills-dir` for project scope). The Desktop helper logic moved to the host-neutral `shared/host_context.py`. Desktop imports, artifacts and the default install behavior are unchanged. Claude Code artifacts record surface `claude-code` and are rejected by the other hosts, and the reverse also holds. Claude Code token and cost savings are not yet measured.

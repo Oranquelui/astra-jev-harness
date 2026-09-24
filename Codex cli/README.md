@@ -115,3 +115,11 @@ python3 make_demo.py /absolute/path/to/new-demo-repo
 ## 選別の診断
 
 Jev利用時の`result.json` → `selection`には、ファイルごとの判定・保持理由、未判定パス、候補と選択後のバイト数を記録します。CLIの既定は従来のバッチ単位の保守的保持です。Desktopの実験用per-file方式をCLI生成へ自動適用しません。
+
+## モデル設定
+
+通常の`run`は、Codex CLIのユーザー設定・信頼済みプロジェクト設定にある`model`と`model_reasoning_effort`を引き継ぎます。Astra・Mediumへの固定指定はありません。未設定の項目はCodexの既定に委ねます。Desktop会話やCLI対話セッションだけで一時的に選んだモデルは引き継ぎません。
+
+ローカルの`config/read`で生成前に読み取り、２項目だけを隔離した生成プロセスに渡します。MCP・プラグイン・権限など他の設定はコピーしません。設定取得に失敗した場合はJev呼び出し前に停止します。独自プロバイダーと旧形式のprofile指定は未対応のため拒否します。`--profile`の選択にも対応していません。
+
+記録の`requested_model`・`requested_reasoning`は指定値です。実際に応答したモデル・推論強度がCLIイベントから確認できないため、`model`・`reasoning`はnullとし、モデル別費用も不明として扱います。過去のベンチマーク設定・測定結果は変更しません。[詳細](../docs/CLI.md#model-verification-and-limits)。

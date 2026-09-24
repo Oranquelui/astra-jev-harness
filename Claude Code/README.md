@@ -1,10 +1,14 @@
 # Claude Code Agent Skill
 
+[日本語](README-ja.md) · [Repository overview](../README.md)
+
 [`claude-jev-coding`](skills/claude-jev-coding/SKILL.md) is a Claude Code Agent Skill. The current Claude Code session implements, reviews and tests the change with its own tools. Jev only judges file relevance. `Claude Code/context.py` is a thin adapter over the same host-neutral core as the Codex Desktop helper (`shared/host_context.py`). It never starts Codex, Astra or another coding agent.
 
 Requires Python 3.10+ and Git. No extra Python packages are needed.
 
 ## Install and check
+
+Run these commands from the root of the cloned harness repository.
 
 ```sh
 python3 install.py --target claude-code --check   # prints the action, writes nothing

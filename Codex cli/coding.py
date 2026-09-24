@@ -13,7 +13,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from cli.benchmark import MODEL, RUNTIME_ARGS, ProtocolError, parse_codex_events, save
+from cli.benchmark import RUNTIME_ARGS, ProtocolError, parse_codex_events, save
+from cli.model_config import read_model_settings, model_arguments
 from shared.jev import failure_record
 from shared.repo_context import (digest, git, load_plan as load_context_plan, safe_path, select, snapshot, SECRET,
                           editable_paths, check_creation_destinations, check_plan_fresh, scope_terms)
@@ -76,7 +77,10 @@ def generation_prompt(plan, paths):
     return prompt, schema
 
 
-def generate(plan, paths, folder, timeout):
+def generate(plan, paths, folder, timeout, model_settings=None):
+    settings = model_settings if model_settings is not None else read_model_settings(plan['repo'])
+    identity = {'requested_model': settings['model'], 'requested_reasoning': settings['reasoning'],
+                'model_settings_source': 'codex_config', 'model': None, 'reasoning': None}
     prompt, schema = generation_prompt(plan, paths)
     editable = editable_paths(plan, paths)
     if len(prompt.encode()) > 500000:
@@ -89,7 +93,7 @@ def generate(plan, paths, folder, timeout):
         env.pop(k, None)
     with tempfile.TemporaryDirectory(prefix='astra-coding-') as cwd:
         argv = ['codex', 'exec', '--ignore-user-config', '--ephemeral', '--skip-git-repo-check', *RUNTIME_ARGS,
-                '--sandbox', 'read-only', '--model', MODEL, '-c', 'model_reasoning_effort="medium"',
+                '--sandbox', 'read-only', *model_arguments(settings),
                 '--json', '--color', 'never', '--output-schema', str(folder / 'schema.json'),
                 '--output-last-message', str(folder / 'answer.json'), '-']
         start = time.monotonic()
@@ -100,13 +104,13 @@ def generate(plan, paths, folder, timeout):
             (folder / 'events.jsonl').write_text(partial['stdout'])
             (folder / 'stderr.txt').write_text(partial['stderr'])
             save(folder / 'metadata.json', {**parse_codex_events(partial['stdout']),
-                 'seconds': time.monotonic()-start, 'model': MODEL, 'failed': True,
+                 'seconds': time.monotonic()-start, **identity, 'failed': True,
                  'failure': failure_record(exc, 'astra_generation')})
             raise
     (folder / 'events.jsonl').write_text(proc['stdout'])
     (folder / 'stderr.txt').write_text(proc['stderr'])
     meta = {**parse_codex_events(proc['stdout']), 'seconds': time.monotonic() - start,
-            'prompt_bytes': len(prompt.encode()), 'model': MODEL, 'reasoning': 'medium'}
+            'prompt_bytes': len(prompt.encode()), **identity}
     save(folder / 'metadata.json', meta)
     if proc['returncode'] or meta['failed'] or not meta['completed'] or meta['contaminated']:
         raise ProtocolError('Astra failed or used a tool; inspect the isolated run logs')
@@ -248,6 +252,10 @@ def run(plan_dir, out, mode, command, timeout, cache_dir=None, evidence_dir=None
         result['evidence_selection_dir'] = str(Path(evidence_dir).resolve())
     save(out / 'result.json', result)
     try:
+        result['stage'] = 'model_configuration'
+        settings = read_model_settings(plan['repo'])
+        result['model_settings'] = settings
+        save(out / 'result.json', result)
         def record_jev(call):
             result['completed_jev_calls'].append(call)
             save(out / 'result.json', result)
@@ -266,7 +274,7 @@ def run(plan_dir, out, mode, command, timeout, cache_dir=None, evidence_dir=None
             save(out / 'result.json', result)
             folder = out / f'astra-{attempt + 1}'
             try:
-                edits, answer, meta = generate(plan, paths, folder, timeout)
+                edits, answer, meta = generate(plan, paths, folder, timeout, model_settings=settings)
             except ProtocolError:
                 if (folder / 'metadata.json').exists():
                     result['astra_calls'].append(json.loads((folder / 'metadata.json').read_text()))
