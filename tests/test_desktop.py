@@ -109,6 +109,42 @@ class DesktopTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             dc.check(self.out)
 
+    def test_local_and_small_auto_skip_keychain_and_provider(self):
+        for mode in ('auto', 'local'):
+            with self.subTest(mode=mode), patch.object(dc, 'execution_environment') as key, \
+                    patch.object(rc, 'call_jev') as provider:
+                folder = self.root / mode
+                record = dc.select(self.plan, folder, mode=mode)
+                self.assertEqual(record['attempted_calls'], 0)
+                self.assertEqual(record['paths'], ['main.py'])
+                self.assertEqual(record['route'], 'astra')
+                self.assertEqual(dc.check(folder)['status'], 'fresh')
+                key.assert_not_called()
+                provider.assert_not_called()
+
+    def test_range_reads_are_bounded_fresh_and_do_not_expose_other_files(self):
+        dc.select(self.plan, self.out, mode='local')
+        result = dc.read_context(self.out, 'main.py', 2, 2)
+        self.assertEqual(result['text'], '    return 1\n')
+        self.assertEqual(result['provider_calls'], 0)
+        for path, start, end in [('other.py', 1, 2), ('../main.py', 1, 2),
+                                 ('main.py', 0, 1), ('main.py', 1, 201), ('main.py', 99, 99)]:
+            with self.subTest(path=path, start=start), self.assertRaises(ProtocolError):
+                dc.read_context(self.out, path, start, end)
+        (self.repo / 'main.py').write_text('changed\n')
+        with self.assertRaises(ProtocolError):
+            dc.read_context(self.out, 'main.py')
+
+    def test_range_read_refuses_large_single_line_without_truncating(self):
+        content = '# ' + 'x' * 25000 + '\n'
+        (self.repo / 'main.py').write_text(content)
+        large_plan = self.root / 'large-plan'
+        dc.make_plan(self.repo, 'Update main.py', large_plan)
+        dc.select(large_plan, self.out, mode='local')
+        with self.assertRaisesRegex(ProtocolError, 'exceeds 24KB'):
+            dc.read_context(self.out, 'main.py', 1, 1)
+        self.assertEqual(json.loads((self.out / 'context.json').read_text())['files']['main.py'], content)
+
     def test_desktop_process_does_not_import_cli_implementation(self):
         script = 'import sys; from desktop import context; assert not any(x.startswith("cli.") for x in sys.modules)'
         result = subprocess.run([os.sys.executable, '-c', script], cwd=Path(__file__).resolve().parent.parent, capture_output=True, text=True)
