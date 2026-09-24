@@ -1,5 +1,15 @@
 # Changelog / 変更履歴
 
+## v0.3.0 — 2026-09-24
+
+- New CLI/Desktop plans judge complete source ranges instead of bypassing files over 22 KB. Request budgeting includes serialized questions and metadata; old plans remain reproducible.
+- Desktop supports bounded `read` and explicit `auto`/`local` bypass modes; the installed Skill selects before loading file bodies.
+- Usage separates ordinary input and provider cache reads/writes. Optional exact-model prices produce estimates only with complete accounting. No new savings claim.
+- 新規planの大きいファイルを全範囲判定し、旧plan互換を維持。Desktopに範囲読込とJev省略モード、計測にcache内訳と任意単価の見積を追加。節約率の実証は別途必要です。
+- Validation: 114 offline tests passed. On one identical two-file synthetic fixture, v0.2.0 → v0.3.0 fully judged files increased 1 → 2 and retained source bytes fell 27,353 → 75. Jev input increased 392 → 6,784 tokens; its API price estimate increased $0.000016464 → $0.000284928. This is a selection check, not an Astra savings result.
+- 検証は114テスト成功。同じ合成入力で全体を判定できたファイルは1→2、保持本文は27,353→75 bytes。Jev入力・費用見積は増えました。今回のAstra全体・総費用削減率は未実証です。README英日版に旧版比較と限界を追記しました。
+- [Version comparison and method / バージョン比較と方法](docs/BENCHMARKS.md#v030-upgrade-check--2026-09-24) · [Aggregate data / 集計値](benchmarks/context-selection-v0.3.0.json)
+
 ## v0.2.0 — 2026-09-23
 
 - Repositories above 2,000,000 eligible source bytes or 1,500 eligible files now get a local task-aware shortlist before Jev. Reviewed `--focus-file` paths, repository guidance, configuration and resolvable dependencies are retained; `--scope-max-calls` bounds the planned requests.

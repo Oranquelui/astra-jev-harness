@@ -1,6 +1,39 @@
 # Measurements, not a savings promise / 比較結果
 
-## What was measured
+## v0.3.0 upgrade check — 2026-09-24
+
+This selection-only comparison ran the released `v0.2.0` code against the same synthetic repository, task and file hashes as the saved v0.3.0 candidate check from earlier that day. Both used the default conservative `batch` policy and explicitly focused `main.py`. There was one live selection per arm, with no retries or Astra child generation. These observations are not interleaved trials or a timing benchmark.
+
+| Selection metric | v0.2.0 | v0.3.0 candidate |
+|---|---:|---:|
+| Candidate / retained files | 2 / 2 | 2 / 1 |
+| Fully judged / unjudged files | 1 / 1 | 2 / 0 |
+| Retained source bytes | 27,353 | 75 |
+| Live Jev requests | 1 | 2 |
+| Jev input / output tokens | 392 / 21 | 6,784 / 76 |
+| Estimated Jev USD | 0.000016464 | 0.000284928 |
+| Selection seconds, one observation only | 0.891 | 2.696 |
+| Astra input and total-task cost | Not measured | Not measured |
+
+The 27,278-byte gardening document was unrelated to the multiplication task. The old 22 KB allowance left it unjudged and retained; complete-range judging omitted it. Retained source bytes fell **99.73%**, while Jev input **increased by 6,392 tokens**. This intentionally easy fixture diagnoses the old bypass; it does not represent a realistic mix of relevant/irrelevant code. The necessary file was pinned, so its retention does not demonstrate model recall. No generated fix or coding acceptance result was measured.
+
+Prices use actual reported input multiplied by $0.042 / 1,000,000, with free output, verified against the [official TypeSafe model page](https://docs.typesafe.ai/models) on 2026-09-24. The extra Jev estimate is **$0.000268464**. Net savings would require a measured decrease in Astra cost greater than that increase, accounting for output, retries and cache changes:
+
+`net saving = (Astra cost before − Astra cost after) − (Jev cost after − Jev cost before)`
+
+Astra cost is unknown for these runs. OpenAI's [prompt-caching guide](https://developers.openai.com/api/docs/guides/prompt-caching) distinguishes ordinary input, cache reads and cache writes; shorter text alone cannot establish the price difference. API estimates are also different from Codex subscription quota consumption. No formula here establishes a Desktop percentage saving.
+
+A separate local check on the 75-byte `main.py` fixture retained all source with zero Jev calls using v0.3.0 `--mode auto`. The threshold is 12,000 source bytes, not tokens. The command default is still `jev`; the updated Skill recommends `auto`. Repeating the larger candidate's identical request used the existing Jev response cache with zero new calls; that capability predates v0.3.0 and is not counted as an upgrade gain.
+
+[Public aggregate, input hashes and caveats](../benchmarks/context-selection-v0.3.0.json). Raw provider records and snapshots remain outside Git, so the original traces cannot be independently audited from this package. Local regression tests cover full Unicode/long-line coverage, missing-range retention, request-budget refusal before calls, bounded/fresh reads, bypass behavior and cache accounting; **114 tests passed**. Real-task holdouts and repeated three-arm comparisons (ordinary Codex, local scope only, local scope + Jev) remain necessary for a savings claim.
+
+### 日本語：今回わかったこと
+
+同じ合成入力で旧版と新版を比較し、旧版が22 KB超で未判定保持した資料を、新版は全範囲判定して除外できました。本文27,353→75 bytes（99.73%減）は選別の改善です。一方、Jev入力は392→6,784 token、費用見積は$0.000016464→$0.000284928に増えました。Astra側の削減がこの差額を上回るかは未測定です。
+
+必要な`main.py`は明示固定済みで、簡単な合成1例・各1回です。実装結果・必要ファイルの判断精度・速度差・総費用の優位性は示しません。過去の「Astra入力1.2%減」と今回の更新効果も別に扱います。75 bytesの別例では`auto`でJev 0回を確認しましたが、Desktop会話全体のtokenや契約枠の節約率には換算しません。
+
+## Historical Astra generation measurement
 
 On 2026-09-22, three synthetic Python repair tasks (pagination, retry configuration, and expiry) were run once per arm in a controlled rerun. Astra was `gpt-6-astra`, reasoning `low`, accessed through the experimenter's own Codex CLI 0.153.2 login. Jev was `jev-1.13.0`. Both arms passed the same 22 behavior checks. Hidden checks and reference fixes were kept out of model inputs; generation was constrained to no tool calls.
 

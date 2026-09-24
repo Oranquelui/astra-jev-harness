@@ -1,6 +1,6 @@
 # Astra + Jev：CodexエージェントスキルとCLIハーネス
 
-[English](README.md) · [リリース v0.2.0](https://github.com/Oranquelui/astra-jev-harness/releases/tag/v0.2.0) · [変更履歴](CHANGELOG.md)
+[English](README.md) · [バージョン 0.3.0](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
 
 このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。
 
@@ -8,7 +8,18 @@
 
 Codex CLIとCodex Desktop向けのローカルCoding Harnessです。「公開APIを変えずにページングを修正して」といった課題から、対象ファイルをスナップショット化し、大きなrepoでは候補をローカルで絞ってからJevが関連性を判断します。依存ファイルを補い、何を残したか、その理由も記録します。
 
-**実験段階です。** 合成3課題の比較では候補ファイルが**85.7%減**りましたが、Astra報告入力トークンは**1.2%減**に留まり、実行時間は増えました。ファイル削減とセッション全体の費用削減は別です。[測定条件と結果](docs/BENCHMARKS.md)を確認してください。
+**実験段階です。** v0.3.0では判定範囲を広げ、本文と費用の集計を明確にしました。**今回の更新によるAstra全体のtoken・総費用の削減率は未実証です。** 後述の「Astra入力1.2%減」は今回より前の測定です。[測定条件と結果](docs/BENCHMARKS.md)。
+
+## v0.3.0で何が改善したか
+
+| 項目 | v0.2.0 | v0.3.0 |
+|---|---|---|
+| 22 KB超の適格ファイル | Jevで判定せず保持 | 全範囲を予算内で分割判定。不確実・判定漏れがあれば全文保持 |
+| Desktopへの引き渡し | Skillが選択済み全文を読む | 本文を会話へ出す前に選別し、必要な行だけ読む |
+| 小さいDesktop課題 | 判定可能なファイルがあれば`select`でJevを使う | Skillは`--mode auto`を推奨。本文12,000 bytes未満なら全候補保持・Jev 0回。コマンドの既定は`jev`を維持 |
+| 使用量・費用 | プロバイダー別token合計。費用見積なし | 通常入力・cache read/write・不明分を分離。任意のモデル別単価で見積 |
+
+Codex Desktop Skillを更新し、全範囲判定と集計はCLIでも使えます。旧planの再現性は維持します。同じJevリクエストの応答再利用はv0.1.0からの機能であり、**v0.3.0で新たに得た節約効果には数えません**。[更新の詳細](docs/CONTEXT-BUDGETS.md) · [変更履歴](CHANGELOG.md)。
 
 ## 評価資料を使ったCoding（実験機能）
 
@@ -92,8 +103,10 @@ python3 cli/main.py apply --run "$DEMO_ROOT/run"
 
 ## 特徴
 
-- **上限のある選別**：対象ファイルの全文をバッチにまとめます。不確実な判断ではコンテキストを残し、解決できるPython/相対JavaScript依存、設定、repo指示を補います。
-- **判定の可視化**：ファイルごとの確率・保持理由・未判定・本文バイト数を記録します。関連性は安全性の判定ではありません。
+本文を会話へ読む前に選別し、`read --selection /absolute/selection --path src/main.py --start-line 1 --end-line 80`で必要行だけ取得できます。`select --mode auto`は12,000本文bytes未満ならJevを省略、`--mode local`は明示的に省略します（既定は`jev`）。cache read/writeの集計と任意単価での費用見積を追加しました。[動作・制限](docs/CONTEXT-BUDGETS.md)。
+
+- **上限のある選別**：対象ファイルの全範囲を分割し、質問を含む予算内でバッチにまとめます。不確実な判断ではコンテキストを残し、解決できるPython/相対JavaScript依存、設定、repo指示を補います。
+- **判定の可視化**：範囲ごとの確率・ファイルの保持理由・判定漏れ・本文バイト数を記録します。関連性は安全性の判定ではありません。
 - **API再呼び出しなしの比較**：保存済み判断から方式を比較します。独立に特定した必要パスはplan内と`scoped_out`の両方を指定でき、ローカル絞り込みとJev選別の取りこぼしを分けて確認できます。ラベルがなければ保持率は不明です。
 - **鮮度確認**：DesktopはHEAD・branch・status・本文・モードとplan/contextの整合を確認します。過去の結果の比較は古いcontextの利用許可ではありません。
 - **適用範囲の制限**：CLIはCodexのread-only sandboxで候補を検証し、整合確認後、許可した編集を衝突検査・復旧記録付きで適用します。
@@ -103,7 +116,7 @@ python3 cli/main.py apply --run "$DEMO_ROOT/run"
 python3 desktop/context.py plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan
 python3 desktop/context.py select --plan /absolute/plan \
-  --out /absolute/selection --max-calls 4
+  --out /absolute/selection --max-calls 4 --mode auto
 python3 desktop/context.py check --selection /absolute/selection
 python3 desktop/context.py compare --selection /absolute/selection \
   --required-file src/main.py
@@ -113,9 +126,9 @@ python3 desktop/context.py compare --selection /absolute/selection \
 
 ## 大きなリポジトリ
 
-適格ファイルが**2,000,000バイトまたは1,500ファイルを超える**場合、`plan`はJevを呼ぶ前に、課題文とファイルの語の一致から候補を**ローカルで**絞ります。Desktopのplanは最大2,000,000バイト、CLIはAstraへ送るプロンプトの別上限500,000バイトに余地を残すため、絞り込み後の候補を350,000バイト以内に抑えます。元の上限内のplanは従来の動作のままです。候補に残すファイルの本文を黙って切り詰めません。
+適格ファイルが**2,000,000バイト・1,500ファイル・予定呼出数のいずれかの上限を超える**場合、`plan`はJevを呼ぶ前に、課題文とファイルの語の一致から候補を**ローカルで**絞ります。Desktopのplanは最大2,000,000バイト、CLIはAstraへ送るプロンプトの別上限500,000バイトに余地を残すため、絞り込み後の候補を350,000バイト以内に抑えます。すべての上限内なら全文候補を維持します。候補に残すファイルの本文を黙って切り詰めません。
 
-課題に必要と分かっている適格ファイルは、繰り返し指定できる`--focus-file`で固定します。`--scope-max-calls`は大きなrepoの**計画上の**Jevリクエスト数の上限です（既定4回、範囲1〜24回）。後の`select --max-calls`による実行上限とは別です。未追跡ファイルは引き続き`--include-file`が必要です。`--focus-file`でも適格性や1ファイル100 KBの上限は迂回できません。
+課題に必要と分かっている適格ファイルは、繰り返し指定できる`--focus-file`で固定します。`--scope-max-calls`は候補全体の**計画上の**Jevリクエスト数の上限です（既定4回、範囲1〜24回）。後の`select --max-calls`による実行上限とは別です。未追跡ファイルは引き続き`--include-file`が必要です。`--focus-file`でも適格性や1ファイル100 KBの上限は迂回できません。
 
 ```sh
 python3 desktop/context.py plan --repo /absolute/repo \
@@ -127,6 +140,25 @@ python3 desktop/context.py plan --repo /absolute/repo \
 同じplan用の2つのフラグを`cli/main.py plan`でも使えます。送信前に`PLAN.md`を確認してください。元の適格ファイル数/バイト数、絞り込み対象外のパス/バイト数、予定Jev呼び出し数を示します。`plan.json`の`scope`が集計、`scoped_out`が対象外の適格ファイルの情報です。**これらのファイルをJevは判定していません**。保護規則で除かれた`excluded`や、Jevが無関係と判定したファイルとも異なります。AGENTS.md・主要設定・解決できる依存は候補に残します。この語の一致は翻訳しないため、ASCIIのパスや識別子を含まない日本語だけの課題では`--focus-file`が必要になる場合があります。課題とファイルの一致がなく**必須パスの明示もない場合**、または必須ファイルが上限に収まらない場合はplanが停止するため、課題またはfocus pathを具体化してください。必要ファイルの保持率とAstraトークンへの効果は、独立した測定なしには分かりません。[設計とTypeSafe公式資料](docs/DESIGN.md)。
 
 ## トークンはどれだけ減るか
+
+### v0.2.0 → v0.3.0：同じ合成入力の比較
+
+2ファイルの合成例を、同じ課題・本文hash・保守的な`batch`方式で比較しました。`main.py`は必要ファイルとして明示固定しています。コード修正完了までの比較ではなく、選別の動作確認です。
+
+| 選別で測定した項目 | v0.2.0 | v0.3.0 |
+|---|---:|---:|
+| 全体を判定できたファイル | 1 / 2 | 2 / 2 |
+| 保持する本文bytes | 27,353 | 75 |
+| 実Jevリクエスト | 1回 | 2回 |
+| Jev入力token | 392 | 6,784 |
+| Jev出力token | 21 | 76 |
+| Jev API費用の見積 | $0.000016464 | $0.000284928 |
+
+以前は未判定だった無関係の27,278 bytesを判定して除外でき、**この単純な合成例の保持本文は99.73%減**りました。これはtoken削減率ではありません。判定対象を増やした分、Jev費用の見積は**$0.000268464増加**しています。Astra側でそれ以上節約できるかは、キャッシュや後続の再読込も含めて未測定です。見積は実際のJev入力tokenに、2026-09-24確認の**100万入力tokenあたり$0.042・出力無料**を適用したもので、請求額ではありません。[公式単価](https://docs.typesafe.ai/models)。
+
+別の75 bytesの合成例では、新しい`auto`方式が**Jev 0回**で本文を保持し、選別の追加呼び出しを省略しました。いずれもDesktop会話全体やCodex契約枠の消費は測定していません。[方法・制限・比較式](docs/BENCHMARKS.md#v030-upgrade-check--2026-09-24) · [集計データ](benchmarks/context-selection-v0.3.0.json)。
+
+### 過去のAstra生成比較：v0.3.0の改善率ではありません
 
 過去の条件調整後の再測定です。小規模なPython合成3課題、各方式1試行、同じAstraモデル・reasoning設定で、両方式とも22件の動作確認を通過しました。
 
@@ -160,14 +192,14 @@ flowchart LR
 
 ## 外部へ送信される情報
 
-`plan`・`check`・`compare`はローカル処理です。`select`は課題・相対パス・対象ソース本文をTypeSafeへ送り、ローカルで`scoped_out`になったファイルの本文はJevへ送りません。CLI生成は選別したcontextに加え、対象外ファイルの**名前**を最大512件と総件数を自分のログインでCodexへ送ります。Astraが不足を示した場合に新しいplanを作れるようにするためです。HarnessはAstra子プロセスの環境から`TYPESAFE_API_KEY`・`OPENAI_API_KEY`・`CODEX_API_KEY`を除外し、Codexログインを配布物へ書き出しません。
+`plan`・`check`・`read`・`compare`はローカル処理です。Jevを使う場合、`select`は課題・相対パス・対象ソース本文をTypeSafeへ送り、ローカルで`scoped_out`になったファイルの本文はJevへ送りません。CLI生成は選別したcontextに加え、対象外ファイルの**名前**を最大512件と総件数を自分のログインでCodexへ送ります。Astraが不足を示した場合に新しいplanを作れるようにするためです。HarnessはAstra子プロセスの環境から`TYPESAFE_API_KEY`・`OPENAI_API_KEY`・`CODEX_API_KEY`を除外し、Codexログインを配布物へ書き出しません。
 
 plan・candidate・runにはソースが入ります。対象repo外に保存し、Gitへ追加しないでください。収集時に既知の秘密情報パターンや対象外形式を除きますが、完全な検出器ではありません。私有コードを送信する前に`PLAN.md`を確認してください。[資格情報の扱い](SECURITY.md)。
 
 ## 現在の制限
 
-- Git追跡済みと明示指定した未追跡のUTF-8ファイル。絞り込み後のplanは最大2 MB・1,500ファイル・1ファイル100 KB。元の適格ファイルが2 MBまたは1,500ファイルを超えると課題に基づくローカル絞り込みが入り、CLIの候補バイト上限は350,000です。確認した未追跡ファイルは`plan --include-file`で追加でき、stageは不要です。
-- 22 KBのバッチ許容量を超えるファイルは推論せず保持します。すべて未判定ならJev呼び出しは0回です。
+- Git追跡済みと明示指定した未追跡のUTF-8ファイル。絞り込み後のplanは最大2 MB・1,500ファイル・1ファイル100 KB。元の適格ファイルが2 MB・1,500ファイル・予定呼出数のいずれかの上限を超えると課題に基づくローカル絞り込みが入り、CLIの候補バイト上限は350,000です。確認した未追跡ファイルは`plan --include-file`で追加でき、stageは不要です。
+- 新規planは22 KB超も全範囲を分割して判定します。不確実・未判定範囲があれば全文を保持し、旧planは従来方式を再現します。[予算と計測](docs/CONTEXT-BUDGETS.md)。
 - 通常のPython `src`配置、ローカルTS alias・JSONC継承、`.mts`等を補完します。動的importや任意のビルド設定の解決は部分的です。
 - CLI検証は依存をインストールしません。成果物を書き込むビルドはread-only検証で動かない場合があります。指定テストの成功は全体の正しさの証明ではありません。
 - Desktopには自動モデル切替・会話圧縮・会話全体のトークン計測はありません。選択済みの会話モデルを使用します。
