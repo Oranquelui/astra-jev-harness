@@ -12,6 +12,10 @@ A local coding harness for Codex CLI, Codex Desktop and Claude Code. Give it a t
 
 **Experimental.** One synthetic CLI coding task at **Astra Extra High (`xhigh`)** used **27.0% fewer Astra input tokens** and **27.2% less at equivalent Standard API rates**, including Jev. Both modes passed the same six checks. Elapsed time was 7.3% shorter in this pair, but 34.6% longer in a separate `medium` pair. Each is one trial per mode, not a general speedup or Desktop result. [Measurements and limits](docs/BENCHMARKS.md).
 
+## Unreleased: inherit Codex CLI model settings
+
+The CLI harness now forwards the configured `model` and `model_reasoning_effort`, rather than forcing Astra/Medium. Desktop and Claude Code harnesses continue using their active sessions. Only model settings are forwarded; generation isolation remains. Missing settings use Codex defaults. Custom providers and profile selection are not supported. Requested settings are recorded separately from unknown serving-model identity; no new token or cost saving is claimed. [Details and limits](docs/CLI.md#model-verification-and-limits).
+
 ## v0.4.0: Claude Code Skill
 
 [`Claude Code/`](Claude%20Code/README.md) adds a `claude-jev-coding` Skill and a thin helper over the same host-neutral selection core as Desktop (`shared/host_context.py`). Claude Code writes the code; Jev only judges file relevance. The helper never starts Codex or Astra. Its artifacts record surface `claude-code` and are rejected by the Desktop and CLI helpers, and the reverse also holds. This is an adaptation, **not a measured Claude Code token or cost reduction**. The historical Codex measurements below are unchanged and do not establish Claude Code savings.
@@ -39,9 +43,9 @@ Select original evaluation excerpts with source hashes and line numbers, retain 
 
 | | Codex CLI | Codex Desktop app | Claude Code |
 |---|---|---|---|
-| Who writes code? | A separate Codex CLI process using Astra | The model in your current conversation; select Astra for the Astra workflow | The current Claude Code session, with its own model and effort |
+| Who writes code? | A separate Codex CLI process using its configured model and reasoning effort | The model in your current conversation; select Astra for the Astra workflow | The current Claude Code session, with its own model and effort |
 | What does Jev do? | Selects context before generation | Selects files for the current conversation to read | Selects files for the current session to read |
-| Workflow | `plan → run → verify → apply` | `plan → select → check → implement/test in the conversation` | Same as Desktop |
+| Workflow | `plan → run → verify → apply` | `plan → select → check → implement/validate as appropriate in the conversation` | Same as Desktop |
 | Target writes | Explicit `apply` after verification | Your normal Desktop editing tools | Claude Code's normal tools and permission prompts |
 | Entrypoint | `python3 "Codex cli/main.py"` | `python3 "Codex Desktop/context.py"` or the Skill | `python3 "Claude Code/context.py"` or `/claude-jev-coding` |
 
@@ -49,7 +53,7 @@ Desktop and Claude Code do **not** spawn another coding agent to generate code. 
 
 ## Start here
 
-Requires Python **3.10+**, Git, and the host you use: Codex for the Codex workflows, or Claude Code for the Claude Skill. Live Jev selection requires your own TypeSafe API key; local selection does not. No third-party Python runtime dependencies. Codex measurements were made locally on macOS with Python 3.14 and Codex CLI 0.153.2; other platforms and Codex versions are not established by that measurement. CLI generation requires access to `gpt-6-astra` in your own Codex account and a working `codex sandbox` command. The included runtime flags are version-sensitive.
+Requires Python **3.10+**, Git, and the host you use: Codex for the Codex workflows, or Claude Code for the Claude Skill. Live Jev selection requires your own TypeSafe API key; local selection does not. No third-party Python runtime dependencies. Codex measurements were made locally on macOS with Python 3.14 and Codex CLI 0.153.2; other platforms and Codex versions are not established by that measurement. CLI generation requires access to the configured model in your own Codex account and a working `codex sandbox` command. The included runtime flags are version-sensitive.
 
 ```sh
 git clone https://github.com/Oranquelui/astra-jev-harness.git
@@ -165,7 +169,7 @@ The same two planning flags are available in `"Codex cli/main.py" plan`. Review 
 
 ### Completed coding task: Astra only versus Astra + Jev
 
-Both arms used the same v0.3.0-based code, plan, **`gpt-6-astra` at Extra High (`xhigh`)**, and six held-out behavior checks. Each generated the same fix in one call. This is one synthetic task and one trial per mode, not a measured v0.2.0-to-v0.3.0 coding speedup. Extra High was set in an isolated test export; the distributed CLI still defaults to `medium`, and the Desktop conversation's setting is independent.
+Both arms used the same v0.3.0-based code, plan, **`gpt-6-astra` at Extra High (`xhigh`)**, and six held-out behavior checks. Each generated the same fix in one call. This is one synthetic task and one trial per mode, not a measured v0.2.0-to-v0.3.0 coding speedup. Extra High was set in an isolated test export; the v0.3.0 CLI defaulted to `medium`, and the Desktop conversation's setting is independent.
 
 | Through verified candidate, Extra High | Astra only | Astra + Jev | Observed change |
 |---|---:|---:|---:|

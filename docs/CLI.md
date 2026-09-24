@@ -23,7 +23,13 @@ Without flags, existing eligible source files can be edited; existing tests rema
 
 ## Model, verification, and limits
 
-The generator currently uses `gpt-6-astra`, reasoning `medium`, with runtime isolation flags defined in `Codex cli/benchmark.py`. Your Codex account must support that model. The helper does not purchase access or change your saved Codex settings. Compatibility was measured with Codex CLI 0.153.2; check newer versions before relying on the integration.
+The generator inherits `model` and `model_reasoning_effort` from Codex CLI's user configuration and trusted project configuration, resolved through the installed CLI's read-only `config/read` API. It does not inherit a Desktop conversation's temporary model selection. If a setting is absent, that setting is left to Codex's default; the harness never substitutes Astra or Medium. Your own Codex login must support the configured model.
+
+Only those two settings are forwarded. Generation retains `--ignore-user-config`, the read-only sandbox and existing runtime isolation flags, so unrelated MCP, plugin, instruction and permission settings are not copied into the generation process. Configuration is read once before Jev selection and reused if more context is requested. Failure stops before any paid selection or generation. Custom model providers and configured legacy profiles are currently rejected rather than silently using a different provider/model; use base model/effort settings with the first-party login. Interactive session-only overrides and `--profile` selection are not inherited.
+
+`result.json` records `model_settings`; generation metadata records `requested_model` and `requested_reasoning`. The exec usage event does not identify the serving model/effort, so `model` and `reasoning` remain null and exact-model cost estimates remain unknown. A requested model is not proof of the model used. No new savings measurement is claimed. The historical benchmark runner retains its explicit Astra/Low configuration.
+
+The configuration reader was checked with Codex CLI 0.153.2 without starting a model turn. These API/runtime flags are version-sensitive. No saved Codex settings or credentials are changed.
 
 The verification command runs through `codex sandbox --permission-profile :read-only`. Dependencies are not installed automatically. Builds requiring generated files or unavailable dependencies can fail independently of the patch. Do not weaken the sandbox or tests to make a candidate pass.
 

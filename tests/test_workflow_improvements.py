@@ -113,7 +113,8 @@ class RepoFixture(unittest.TestCase):
         from cli import coding
         rc.snapshot(self.repo,'Fix',self.root/'plan')
         error=jev.ProtocolError('safe failure',error_kind='http_error',http_status=429)
-        with patch.object(rc,'call_jev',side_effect=error):
+        with patch.object(rc,'call_jev',side_effect=error), \
+                patch.object(coding,'read_model_settings',return_value={'model': None, 'reasoning': None}):
             r=coding.run(self.root/'plan',self.root/'run','jev',None,2)
         self.assertEqual(r['attempted_jev_calls'],1)
         self.assertEqual(r['attempted_astra_calls'],0)

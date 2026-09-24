@@ -12,6 +12,10 @@ Codex CLI・Codex Desktop・Claude Code向けのローカルCoding Harnessです
 
 **実験段階です。** **Astra Extra High（`xhigh`）**で合成CLI課題を修正・テストまで比較すると、**Astra入力27.0%減、Jev込みのStandard API単価換算27.2%減**でした。両方式とも同じ6件の確認に成功。所要時間はこの比較では7.3%減でしたが、別の`medium`比較では34.6%増でした。各方式1試行であり、一般的な高速化やDesktopでの効果は示しません。[測定条件と結果](docs/BENCHMARKS.md)。
 
+## 未リリース：Codex CLIのモデル設定を継承
+
+CLIハーネスはAstra・Mediumへの固定をやめ、設定された`model`と`model_reasoning_effort`を引き継ぎます。Desktop・Claude Codeハーネスは従来どおり現在の会話設定を使います。生成プロセスの隔離は維持し、モデル設定だけを渡します。未設定項目はCodexの既定を使います。独自プロバイダーとprofile選択は未対応です。指定値と確認できない応答モデルは分けて記録し、新しいtoken・費用削減は主張しません。[詳細と制限](Codex%20cli/README.md#モデル設定)。
+
 ## v0.4.0：Claude Code Skill
 
 [`Claude Code/`](Claude%20Code/README.md)に、`claude-jev-coding` Skillと小さなhelperを追加しました。helperはDesktopと同じホスト非依存の選別コア（`shared/host_context.py`）を使います。コードを書くのはClaude Codeで、Jevはファイルの関連性だけを判定します。helperがCodexやAstraを起動することはありません。成果物にはsurface `claude-code`が記録され、Desktop・CLIのhelperはこれを受け付けません。逆方向も同様に拒否します。これは移植であり、**Claude Codeでのtoken・費用削減は測定していません**。下記の過去のCodex測定結果は変更しておらず、Claude Codeでの削減効果を示すものではありません。
@@ -39,9 +43,9 @@ Codex Desktop Skillを更新し、全範囲判定と集計はCLIでも使えま�
 
 | | Codex CLI | Codex Desktop app | Claude Code |
 |---|---|---|---|
-| コードを書くモデル | 別プロセスのCodex CLIのAstra | 現在の会話モデル。Astra方式では会話側でAstraを選択 | 現在のClaude Codeセッション（モデル・effortはそのまま） |
+| コードを書くモデル | 別プロセスのCodex CLI（設定済みモデル・推論強度） | 現在の会話モデル。Astra方式では会話側でAstraを選択 | 現在のClaude Codeセッション（モデル・effortはそのまま） |
 | Jevの役割 | 生成前のコンテキスト選別 | 現在の会話が読むファイルの選別 | 現在のセッションが読むファイルの選別 |
-| 手順 | `plan → run → verify → apply` | `plan → select → check → 会話で実装・テスト` | Desktopと同じ |
+| 手順 | `plan → run → verify → apply` | `plan → select → check → 会話で実装・変更に応じた検証` | Desktopと同じ |
 | 対象への書き込み | 検証後の明示的な`apply` | Desktopの通常の編集ツール | Claude Codeの通常のツールと許可確認 |
 | 入口 | `python3 "Codex cli/main.py"` | `python3 "Codex Desktop/context.py"`またはSkill | `python3 "Claude Code/context.py"`または`/claude-jev-coding` |
 
@@ -49,7 +53,7 @@ DesktopとClaude Codeは、コード生成のために別のコーディング�
 
 ## はじめに
 
-必要なのはPython **3.10以上**、Git、利用するホストです。Codex方式にはCodex、Claude SkillにはClaude Codeを使います。実際にJevへ照会する場合は自分のTypeSafe APIキーが必要で、ローカル選別では不要です。追加Pythonライブラリは不要です。Codexの測定環境はmacOS・Python 3.14・Codex CLI 0.153.2です。他のOSやCodexバージョンの動作をこの測定で保証するものではありません。CLI生成には自分のCodexアカウントで`gpt-6-astra`を利用でき、`codex sandbox`が動く必要があります。使用するCodexのフラグはバージョンに依存します。
+必要なのはPython **3.10以上**、Git、利用するホストです。Codex方式にはCodex、Claude SkillにはClaude Codeを使います。実際にJevへ照会する場合は自分のTypeSafe APIキーが必要で、ローカル選別では不要です。追加Pythonライブラリは不要です。Codexの測定環境はmacOS・Python 3.14・Codex CLI 0.153.2です。他のOSやCodexバージョンの動作をこの測定で保証するものではありません。CLI生成には自分のCodexアカウントで設定したモデルを利用でき、`codex sandbox`が動く必要があります。使用するCodexのフラグはバージョンに依存します。
 
 ```sh
 git clone https://github.com/Oranquelui/astra-jev-harness.git
@@ -165,7 +169,7 @@ python3 "Codex Desktop/context.py" plan --repo /absolute/repo \
 
 ### 修正・テストまで：Astra単独とAstra＋Jev
 
-両方式で同じv0.3.0ベースのコードとplan、**`gpt-6-astra`・Extra High（`xhigh`）**、入力には含めない同じ6件の動作確認を使いました。同じ修正コードを各1回の生成で得ています。合成1課題・各1試行であり、v0.2.0からの速度向上を測ったものではありません。Extra Highは隔離した検証用コピーで設定しました。配布CLIの既定は`medium`のままで、Desktop会話の設定とは独立しています。
+両方式で同じv0.3.0ベースのコードとplan、**`gpt-6-astra`・Extra High（`xhigh`）**、入力には含めない同じ6件の動作確認を使いました。同じ修正コードを各1回の生成で得ています。合成1課題・各1試行であり、v0.2.0からの速度向上を測ったものではありません。Extra Highは隔離した検証用コピーで設定しました。当時のv0.3.0 CLIの既定は`medium`で、Desktop会話の設定とは独立しています。
 
 | 検証済み候補ができるまで（Extra High） | Astra単独 | Astra＋Jev | 観測差 |
 |---|---:|---:|---:|
@@ -227,7 +231,7 @@ flowchart LR
   V --> A[明示的apply]
   P --> D[Desktop: context受け渡し]
   D --> F[鮮度確認]
-  F --> E[現在の会話で実装・テスト]
+  F --> E[現在の会話で実装・変更に応じた検証]
 ```
 
 `shared/`はTypeSafe通信・snapshot・選別・資格情報の取得、`Codex cli/`は生成・候補検証・適用、`shared/host_context.py`はホスト非依存のcontext受け渡し、`Codex Desktop/`と`Claude Code/`は薄いホスト用adapterとSkillを担当します。rootスクリプトは互換入口です。JevはNoulのyes/no形式で関連性を判断し、コードは生成しません。回数・パス等の制約はコードが管理します。
