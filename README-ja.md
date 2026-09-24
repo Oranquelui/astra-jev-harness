@@ -18,7 +18,7 @@ CLIハーネスはAstra・Mediumへの固定をやめ、設定された`model`�
 
 ## v0.4.0：Claude Code Skill
 
-[`Claude Code/`](Claude%20Code/README.md)に、`claude-jev-coding` Skillと小さなhelperを追加しました。helperはDesktopと同じホスト非依存の選別コア（`shared/host_context.py`）を使います。コードを書くのはClaude Codeで、Jevはファイルの関連性だけを判定します。helperがCodexやAstraを起動することはありません。成果物にはsurface `claude-code`が記録され、Desktop・CLIのhelperはこれを受け付けません。逆方向も同様に拒否します。これは移植であり、**Claude Codeでのtoken・費用削減は測定していません**。下記の過去のCodex測定結果は変更しておらず、Claude Codeでの削減効果を示すものではありません。
+[`Claude Code/`](Claude%20Code/README-ja.md)に、`claude-jev-coding` Skillと小さなhelperを追加しました。helperはDesktopと同じホスト非依存の選別コア（`shared/host_context.py`）を使います。コードを書くのはClaude Codeで、Jevはファイルの関連性だけを判定します。helperがCodexやAstraを起動することはありません。成果物にはsurface `claude-code`が記録され、Desktop・CLIのhelperはこれを受け付けません。逆方向も同様に拒否します。これは移植であり、**Claude Codeでのtoken・費用削減は測定していません**。下記の過去のCodex測定結果は変更しておらず、Claude Codeでの削減効果を示すものではありません。
 
 ## v0.3.1：方式が分かるディレクトリ名
 
@@ -99,7 +99,7 @@ python3 install.py --target claude-code
 python3 ~/.claude/skills/claude-jev-coding/scripts/context.py doctor
 ```
 
-`~/.claude/skills`へ`claude-jev-coding`の参照リンクだけを作成します。プロジェクト単位で使う場合は`--skills-dir "/absolute/project/.claude/skills"`を指定します。上書き拒否・認証情報を扱わない点はDesktop版と同じで、何度実行しても結果は変わりません。`doctor`は`"surface": "claude-code"`とキーの有無を表示し、キーの値は表示しません。TypeSafeキーは自分のものを、環境変数または同じ任意のKeychain項目から使います。対象リポジトリでClaude CodeにJevで選別した変更を依頼するか、`/claude-jev-coding <課題>`で明示的に呼び出します。Skillはツールを事前承認せず、モデル・effortも変更せず、contextもforkしません。[Claude Codeの詳細](Claude%20Code/README.md)。
+`~/.claude/skills`へ`claude-jev-coding`の参照リンクだけを作成します。プロジェクト単位で使う場合は`--skills-dir "/absolute/project/.claude/skills"`を指定します。上書き拒否・認証情報を扱わない点はDesktop版と同じで、何度実行しても結果は変わりません。`doctor`は`"surface": "claude-code"`とキーの有無を表示し、キーの値は表示しません。TypeSafeキーは自分のものを、環境変数または同じ任意のKeychain項目から使います。対象リポジトリでClaude CodeにJevで選別した変更を依頼するか、`/claude-jev-coding <課題>`で明示的に呼び出します。Skillはツールを事前承認せず、モデル・effortも変更せず、contextもforkしません。[Claude Codeの詳細](Claude%20Code/README-ja.md)。
 
 2026-09-24にClaude Code 2.1.281で、Skillの検出・起動、plan/select/check/行範囲の読み取り、Claudeによる編集、テスト用コードの３件成功までローカルで確認しました。この確認は`--mode local`（Jev呼び出し０回）で行っており、Jev実接続やtoken削減のベンチマークではありません。ハーネス全体のオフラインテストは141件成功しています。
 
