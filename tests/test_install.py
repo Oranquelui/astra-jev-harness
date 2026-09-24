@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import install
 
 
@@ -20,7 +21,7 @@ class InstallTests(unittest.TestCase):
             self.assertEqual(install.install(tmp)[0], 'installed')
             self.assertEqual(install.install(tmp)[0], 'already-installed')
             link = Path(tmp) / 'astra-jev-coding'
-            self.assertEqual(link.resolve(), install.ROOT / 'desktop/skills/astra-jev-coding')
+            self.assertEqual(link.resolve(), install.ROOT / 'Codex Desktop/skills/astra-jev-coding')
             p = subprocess.run([sys.executable, str(link / 'scripts/context.py'), '--help'],
                                cwd=tmp, capture_output=True, text=True)
             self.assertEqual(p.returncode, 0, p.stderr)
@@ -35,6 +36,44 @@ class InstallTests(unittest.TestCase):
                 else: target.symlink_to(Path(tmp) / 'absent')
                 with self.assertRaises(ValueError): install.install(tmp)
                 self.assertTrue(target.exists() or target.is_symlink())
+
+    def test_migrates_only_this_clones_legacy_link_and_check_is_read_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            link = Path(tmp) / 'astra-jev-coding'
+            legacy = install.ROOT / 'desktop/skills/astra-jev-coding'
+            link.symlink_to(legacy, target_is_directory=True)
+            self.assertEqual(install.install(tmp, check=True)[0], 'would-update')
+            self.assertEqual(link.readlink(), legacy)
+            self.assertEqual(install.install(tmp)[0], 'updated')
+            self.assertEqual(link.resolve(), install.ROOT / 'Codex Desktop/skills/astra-jev-coding')
+            self.assertEqual(install.install(tmp)[0], 'already-installed')
+
+    def test_failed_migration_preserves_the_original_link(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            link = Path(tmp) / 'astra-jev-coding'
+            legacy = install.ROOT / 'desktop/skills/astra-jev-coding'
+            link.symlink_to(legacy, target_is_directory=True)
+            with patch.object(Path, 'replace', side_effect=OSError('fixture failure')):
+                with self.assertRaises(OSError):
+                    install.install(tmp)
+            self.assertEqual(link.readlink(), legacy)
+            self.assertEqual(list(Path(tmp).iterdir()), [link])
+
+    def test_does_not_replace_a_link_to_existing_legacy_skill_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = (Path(tmp) / 'checkout').resolve()
+            new = root / 'Codex Desktop/skills/astra-jev-coding'
+            new.mkdir(parents=True)
+            (new / 'SKILL.md').write_text('new fixture')
+            legacy = root / 'desktop/skills/astra-jev-coding'
+            legacy.mkdir(parents=True)
+            (legacy / 'SKILL.md').write_text('user content')
+            link = Path(tmp) / 'astra-jev-coding'
+            link.symlink_to(legacy, target_is_directory=True)
+            with patch.object(install, 'ROOT', root), self.assertRaises(ValueError):
+                install.install(tmp)
+            self.assertEqual(link.resolve(), legacy)
+            self.assertEqual((legacy / 'SKILL.md').read_text(), 'user content')
 
     def test_respects_codex_home_without_reading_or_copying_auth(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -9,7 +9,7 @@ Use Jev for bounded file-relevance judgments. The active Desktop conversation pe
 
 ## Entrypoint and credentials
 
-Run `python3 <this-skill-directory>/scripts/context.py ...` using the actual absolute Skill path. The wrapper resolves its symlink to `desktop/context.py` in the associated Harness checkout. Read that checkout's `desktop/README.md` for limits. `doctor` reports the checkout, key availability, and source without calling a provider or displaying credentials.
+Run `python3 "<this-skill-directory>/scripts/context.py" ...` using the actual absolute Skill path. The wrapper resolves its symlink to `Codex Desktop/context.py` in the associated Harness checkout. Read that checkout's `Codex Desktop/README.md` for limits. `doctor` reports the checkout, key availability, and source without calling a provider or displaying credentials.
 
 An existing `TYPESAFE_API_KEY` takes precedence. On macOS, the helper can read login Keychain service `astra-jev-harness`, account `TYPESAFE_API_KEY`, into its own process environment. Do not print keys, put them into prompts/arguments, search unrelated `.env` files, or forward them to other processes. A missing key blocks selection, not useful local preparation. An access timeout is not proof that the key is absent.
 

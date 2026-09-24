@@ -34,11 +34,11 @@ The policy keeps pinned and unjudged excerpts and any excerpt whose relevance, c
 Use the **same task file** for the repository plan and evidence plan. Then either surface can attach a fresh packet:
 
 ```sh
-python3 desktop/context.py select --plan /absolute/repo-plan \
+python3 "Codex Desktop/context.py" select --plan /absolute/repo-plan \
   --out /absolute/context-selection --max-calls 4 \
   --evidence /absolute/evidence-selection
 
-python3 cli/main.py run --plan /absolute/cli-plan \
+python3 "Codex cli/main.py" run --plan /absolute/cli-plan \
   --out /absolute/cli-run --mode jev \
   --evidence /absolute/evidence-selection \
   --verify-json '["python3", "-m", "unittest", "discover"]'
