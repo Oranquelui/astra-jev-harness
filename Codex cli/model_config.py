@@ -104,6 +104,8 @@ def read_model_settings(repo, timeout=15):
             send({'id': 2, 'method': 'config/read', 'params': {
                 'includeLayers': False, 'cwd': str(Path(repo).resolve())}})
             return model_settings(response(2).get('config'))
+        except ProtocolError:
+            raise
         except (OSError, ValueError):
             raise ProtocolError('Codex configuration read failed; no model call made') from None
         finally:

@@ -76,6 +76,19 @@ print(json.dumps({'id': request['id'], 'result': {'config': {
 ''')
         self.assertEqual(result, {'model': 'configured-test', 'reasoning': 'high'})
 
+    def test_unsupported_provider_retains_safe_actionable_diagnostic(self):
+        script = '''import json, sys
+first = json.loads(sys.stdin.readline())
+print(json.dumps({'id': first['id'], 'result': {}}), flush=True)
+sys.stdin.readline()
+request = json.loads(sys.stdin.readline())
+print(json.dumps({'id': request['id'], 'result': {'config': {
+    'model_provider': 'private-provider-secret'}}}), flush=True)
+'''
+        with self.assertRaisesRegex(ProtocolError, 'Custom Codex model providers are not supported') as caught:
+            self.invoke_reader(script)
+        self.assertNotIn('private-provider-secret', str(caught.exception))
+
     def test_transport_failure_timeout_and_malformed_output_are_redacted(self):
         scripts = [
             "import time; time.sleep(10)",
@@ -86,6 +99,8 @@ print(json.dumps({'id': request['id'], 'result': {'config': {
             with self.subTest(script=script), self.assertRaises(ProtocolError) as caught:
                 self.invoke_reader(script, timeout=.25)
             self.assertNotIn('private-fixture-secret', str(caught.exception))
+            if 'time.sleep' in script:
+                self.assertIn('timed out', str(caught.exception))
 
 
 class GenerationSettingsTests(unittest.TestCase):
