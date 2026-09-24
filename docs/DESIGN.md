@@ -2,7 +2,7 @@
 
 Jev supplies typed relevance judgments; local code owns the workflow. It is not used to grant permissions or declare that a patch is correct.
 
-The current split is deliberate: CLI calls the user's logged-in Codex to generate candidate edits and verify/apply them; Desktop hands selected context to the current conversation. The latter never launches another Codex CLI for generation.
+The current split is deliberate: CLI calls the user's logged-in Codex to generate candidate edits and verify/apply them; Desktop hands selected context to the current conversation. The latter never launches another Codex CLI for generation. The Claude Code Skill uses the same host-neutral handoff (`shared/host_context.py`) for the current Claude Code session. Its artifacts carry surface `claude-code`, and no host accepts another host's plans or selections.
 
 ## Selection
 

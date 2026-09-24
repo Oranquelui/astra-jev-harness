@@ -15,7 +15,8 @@ class EntrypointTests(unittest.TestCase):
             for script, args in [('Codex cli/main.py', ['plan', '--help']),
                                  ('Codex cli/coding.py', ['plan', '--help']), ('coding.py', ['plan', '--help']),
                                  ('Codex cli/benchmark.py', ['--help']), ('harness.py', ['--help']),
-                                 ('Codex Desktop/context.py', ['plan', '--help'])]:
+                                 ('Codex Desktop/context.py', ['plan', '--help']),
+                                 ('Claude Code/context.py', ['plan', '--help'])]:
                 with self.subTest(script=script):
                     result = subprocess.run([sys.executable, str(ROOT / script), *args], cwd=cwd,
                                             text=True, capture_output=True)

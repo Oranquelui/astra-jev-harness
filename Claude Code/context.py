@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only Jev context handoff for the active Codex Desktop conversation."""
+"""Read-only Jev context handoff for the active Claude Code conversation."""
 from pathlib import Path
 import sys
 
@@ -10,10 +10,9 @@ from shared import repo_context as rc
 from shared.credentials import execution_environment
 from shared.jev import ProtocolError
 
-SURFACE = 'desktop'
-LABEL = 'Desktop'
-NO_JEV_ROUTE = 'astra'  # Published Desktop records name the no-Jev route 'astra'.
-write_json = hc.write_json
+SURFACE = 'claude-code'
+LABEL = 'Claude Code'
+NO_JEV_ROUTE = 'local'
 
 
 def _host():
@@ -25,12 +24,8 @@ def fresh(plan):
     rc.check_plan_fresh(plan)
 
 
-def load_desktop_plan(path):
-    return hc.load_surface_plan(path, _host())
-
-
 def load_host_plan(path):
-    return load_desktop_plan(path)
+    return hc.load_surface_plan(path, _host())
 
 
 def make_plan(repo, task, out, include_paths=None, focus_paths=None, scope_max_calls=4):
