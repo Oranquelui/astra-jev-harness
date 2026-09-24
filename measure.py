@@ -7,17 +7,19 @@ from decimal import Decimal, InvalidOperation
 
 
 def cache_counts(usage):
-    """API nested details or Codex CLI cache reads; absent fields stay unknown."""
+    """API nested details or Codex CLI cache counts; absent fields stay unknown."""
     total = usage.get('input_tokens')
+    if type(total) is not int or total < 0:
+        return None, None, None
     details = usage.get('input_tokens_details')
     details = details if isinstance(details, dict) else {}
-    read = details.get('cached_tokens', usage.get('cached_input_tokens'))
-    write = details.get('cache_write_tokens', usage.get('cache_write_tokens'))
-    valid = lambda n: type(n) is int and 0 <= n <= total
-    if not valid(read):
-        read = None
-    if not valid(write):
-        write = None
+    def count(nested, *aliases):
+        values = ([details[nested]] if nested in details else []) + [usage[k] for k in aliases if k in usage]
+        if not values or any(type(n) is not int or not 0 <= n <= total for n in values):
+            return None
+        return values[0] if len(set(values)) == 1 else None
+    read = count('cached_tokens', 'cached_input_tokens')
+    write = count('cache_write_tokens', 'cache_write_tokens', 'cache_write_input_tokens')
     if read is not None and write is not None and read + write > total:
         return None, None, None
     ordinary = total - read - write if read is not None and write is not None else None
@@ -30,7 +32,7 @@ def provider(calls, attempted, cache_required=True):
              and all(type(c['usage'].get(k)) is int and c['usage'][k] >= 0
                      for k in ('input_tokens', 'output_tokens'))]
     unknown = None if attempted is None else max(attempted, len(live)) - len(known)
-    cache = [cache_counts(u) for u in known]
+    cache = [cache_counts(u) if cache_required else (0, 0, u['input_tokens']) for u in known]
     cache_unknown = None if unknown is None else unknown + sum(o is None for _, _, o in cache)
     ordinary = sum(o for _, _, o in cache if o is not None)
     return {'known_cached_input_tokens': sum(r for r, _, _ in cache if r is not None),

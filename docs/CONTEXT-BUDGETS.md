@@ -27,7 +27,7 @@ python3 desktop/context.py read --selection /absolute/selection --path src/main.
 
 ## Measurement
 
-`measure.py` separates ordinary input, cached reads and cache writes when the provider actually reports them. It accepts API `input_tokens_details.cached_tokens` / `cache_write_tokens` and CLI `cached_input_tokens`. Missing write counts remain unknown; they are not invented as zero. Invalid counts, unreturned usage and failed attempts prevent complete cost claims. Known subtotals are explicitly partial. Jev has no OpenAI cache-accounting requirement.
+`measure.py` separates ordinary input, cached reads and cache writes when the provider actually reports them. It accepts API `input_tokens_details.cached_tokens` / `cache_write_tokens` and CLI `cached_input_tokens` / `cache_write_input_tokens`. Conflicting aliases stay unknown. Missing write counts remain unknown; they are not invented as zero. Invalid counts, unreturned usage and failed attempts prevent complete cost claims. Known subtotals are explicitly partial. Jev has no OpenAI cache-accounting requirement: valid reported input remains known ordinary input without those cache fields; missing provider usage still prevents a complete total.
 
 Optional `--prices /absolute/prices.json` accepts USD-per-million rates keyed by exact returned model ID. For example, a file containing only the verified Jev rate is:
 

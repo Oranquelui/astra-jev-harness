@@ -5,6 +5,8 @@ Never silently truncate a file or label an uncovered range irrelevant.
 """
 import hashlib
 import json
+from bisect import bisect_right
+from itertools import accumulate
 from shared.jev import ProtocolError, jev_request
 
 FORMAT = 'fragments-v1'
@@ -60,16 +62,19 @@ def units(plan):
     result = {}
     for path, record in sorted(plan['files'].items()):
         parts = split_text(record['content'])
-        offset, line = 0, 1
+        # Match Desktop bounded reads, including CRLF and Unicode separators.
+        line_ends = list(accumulate(len(line.encode()) for line in record['content'].splitlines(keepends=True)))
+        offset = 0
         for index, text in enumerate(parts):
             key = path if len(parts) == 1 else '@span/' + hashlib.sha256(path.encode()).hexdigest() + '/' + str(index)
             while key in result or (len(parts) > 1 and key in plan['files']):
                 key = '@' + key
             end = offset + len(text.encode())
             result[key] = {'path': path, 'start_byte': offset, 'end_byte': end,
-                           'start_line': line, 'end_line': max(line, line + text.count('\n') - int(text.endswith('\n'))),
+                           'start_line': bisect_right(line_ends, offset) + 1,
+                           'end_line': bisect_right(line_ends, max(offset, end - 1)) + 1,
                            'complete_file': len(parts) == 1, 'text': text}
-            offset, line = end, line + text.count('\n')
+            offset = end
     return result
 
 

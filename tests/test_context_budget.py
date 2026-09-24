@@ -13,6 +13,21 @@ def plan(files):
 
 
 class FragmentBudgetTests(unittest.TestCase):
+    def test_line_metadata_matches_bounded_read_line_separators(self):
+        from shared.context_chunks import units
+        for separator in ('\n', '\r', '\r\n', '\v', '\f', '\x1c', '\x85', '\u2028', '\u2029'):
+            with self.subTest(separator=repr(separator)):
+                parts = list(units(plan({'a.txt': separator.join(['first', 'second', 'third', ''])})).values())
+                self.assertEqual((parts[0]['start_line'], parts[0]['end_line']), (1, 3))
+
+    def test_line_metadata_handles_split_crlf_and_long_lines(self):
+        from shared.context_chunks import units
+        parts = ['a\r', '\nb\u2028', 'long', 'tail\r', 'z']
+        with patch('shared.context_chunks.split_text', return_value=parts):
+            result = list(units(plan({'a.txt': ''.join(parts)})).values())
+        self.assertEqual([(u['start_line'], u['end_line']) for u in result],
+                         [(1, 1), (1, 2), (3, 3), (3, 3), (4, 4)])
+
     def test_large_unicode_and_long_line_are_fully_covered_with_bounded_requests(self):
         from shared.context_chunks import units, request_bounds
         p = plan({'big.py': '# 日本語🙂\\"\n' * 4000, 'long.md': 'あ' * 15000})
@@ -73,6 +88,18 @@ class FragmentBudgetTests(unittest.TestCase):
 
 
 class CacheUsageTests(unittest.TestCase):
+    def test_jev_input_is_known_without_cache_details(self):
+        calls = [{'usage': {'input_tokens': 1000, 'output_tokens': 10}}]
+        r = measure.provider(calls, 1, cache_required=False)
+        self.assertFalse(r['cache_accounting_applicable'])
+        self.assertIsNone(r['complete_cache_usage'])
+        self.assertEqual(r['ordinary_input_tokens'], 1000)
+        self.assertEqual(r['unknown_cache_usage_calls'], 0)
+        missing = measure.provider(calls, 2, cache_required=False)
+        self.assertEqual(missing['known_ordinary_input_tokens'], 1000)
+        self.assertIsNone(missing['ordinary_input_tokens'])
+        self.assertFalse(missing['complete_usage'])
+
     def test_prices_count_each_input_category_once_and_reuse_is_free(self):
         prices = {'test-model': {'input': 10, 'output': 20, 'cache_read': 1, 'cache_write': 12.5}}
         calls = [{'model': 'test-model', 'usage': {'input_tokens': 1000, 'output_tokens': 10,
@@ -106,6 +133,26 @@ class CacheUsageTests(unittest.TestCase):
         self.assertEqual(r['known_cached_input_tokens'], 800)
         self.assertFalse(r['complete_cache_usage'])
         self.assertEqual(r['unknown_cache_usage_calls'], 1)
+        self.assertIsNone(r['ordinary_input_tokens'])
+
+    def test_cli_reported_cache_write_input_tokens_are_accounted(self):
+        usage = {'input_tokens': 1000, 'cached_input_tokens': 600,
+                 'cache_write_input_tokens': 300, 'output_tokens': 10}
+        r = measure.provider([{'usage': usage}], 1)
+        self.assertEqual(r['known_cache_write_tokens'], 300)
+        self.assertEqual(r['ordinary_input_tokens'], 100)
+        self.assertTrue(r['complete_cache_usage'])
+        prices = {'test-model': {'input': 10, 'output': 20, 'cache_read': 1, 'cache_write': 12.5}}
+        self.assertEqual(measure.estimate_cost([{'model': 'test-model', 'usage': usage}], 1,
+                                             prices, True)['estimated_usd'], '0.00555')
+
+    def test_conflicting_cache_aliases_do_not_produce_a_complete_estimate(self):
+        usage = {'input_tokens': 1000, 'cached_input_tokens': 600,
+                 'cache_write_input_tokens': 300,
+                 'input_tokens_details': {'cached_tokens': 500, 'cache_write_tokens': 200},
+                 'output_tokens': 10}
+        r = measure.provider([{'usage': usage}], 1)
+        self.assertFalse(r['complete_cache_usage'])
         self.assertIsNone(r['ordinary_input_tokens'])
 
     def test_invalid_cache_counts_and_failed_calls_remain_unknown(self):
