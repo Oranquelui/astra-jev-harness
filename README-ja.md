@@ -2,7 +2,7 @@
 
 [English](README.md) · [バージョン 0.3.1](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
 
-このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](Codex%20Desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。
+このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](Codex%20Desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。別途、**Claude Code用の[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md)**（未リリース）を追加し、同じコンテキスト選別を現在のClaude Codeセッションで使えるようにしました。
 
 **大きなrepoでは先に候補を絞り、Jevが候補を判断し、Astraがコードを書く。**
 
@@ -15,6 +15,10 @@ Codex CLIとCodex Desktop向けのローカルCoding Harnessです。「公開AP
 ## v0.3.1：方式が分かるディレクトリ名
 
 実装ディレクトリを[`Codex Desktop/`](Codex%20Desktop/README.md)と[`Codex cli/`](Codex%20cli/README.md)へ変更しました。シェルのコマンドでは空白を含むパスを引用符で囲みます。既存cloneの更新後に`python3 install.py`を再実行すると、このcloneを指す旧Desktop Skillリンクを移行します。他のSkillは保持します。rootの互換スクリプトとPython importは継続して使えます。今回の配布構成変更による新しいtoken・費用削減は主張しません。
+
+## 未リリース：Claude Code Skill
+
+[`Claude Code/`](Claude%20Code/README.md)に、`claude-jev-coding` Skillと小さなhelperを追加しました。helperはDesktopと同じホスト非依存の選別コア（`shared/host_context.py`）を使います。コードを書くのはClaude Codeで、Jevはファイルの関連性だけを判定します。helperがCodexやAstraを起動することはありません。成果物にはsurface `claude-code`が記録され、Desktop・CLIのhelperはこれを受け付けません。逆方向も同様に拒否します。これは移植であり、**Claude Codeでのtoken・費用削減は測定していません**。バージョン0.3.1とCodexの測定結果は変わりません。
 
 ## v0.3.0で何が改善したか
 
@@ -31,21 +35,21 @@ Codex Desktop Skillを更新し、全範囲判定と集計はCLIでも使えま�
 
 原文・行番号・出典hashを保ちながら評価資料を選別し、CLI/Desktopへ渡せます。失敗・予算の記録は明示的に固定し、同一Jevリクエストの再利用と保存runの使用量比較にも対応しました。[使い方と制限](docs/EVIDENCE.md)。
 
-## CLIとDesktopの違い
+## CLI・Desktop・Claude Codeの違い
 
-| | Codex CLI | Codex Desktop app |
-|---|---|---|
-| コードを書くモデル | 別プロセスのCodex CLIのAstra | 現在の会話モデル。Astra方式では会話側でAstraを選択 |
-| Jevの役割 | 生成前のコンテキスト選別 | 現在の会話が読むファイルの選別 |
-| 手順 | `plan → run → verify → apply` | `plan → select → check → 会話で実装・テスト` |
-| 対象への書き込み | 検証後の明示的な`apply` | Desktopの通常の編集ツール |
-| 入口 | `python3 "Codex cli/main.py"` | `python3 "Codex Desktop/context.py"`またはSkill |
+| | Codex CLI | Codex Desktop app | Claude Code |
+|---|---|---|---|
+| コードを書くモデル | 別プロセスのCodex CLIのAstra | 現在の会話モデル。Astra方式では会話側でAstraを選択 | 現在のClaude Codeセッション（モデル・effortはそのまま） |
+| Jevの役割 | 生成前のコンテキスト選別 | 現在の会話が読むファイルの選別 | 現在のセッションが読むファイルの選別 |
+| 手順 | `plan → run → verify → apply` | `plan → select → check → 会話で実装・テスト` | Desktopと同じ |
+| 対象への書き込み | 検証後の明示的な`apply` | Desktopの通常の編集ツール | Claude Codeの通常のツールと許可確認 |
+| 入口 | `python3 "Codex cli/main.py"` | `python3 "Codex Desktop/context.py"`またはSkill | `python3 "Claude Code/context.py"`または`/claude-jev-coding` |
 
-Desktop版はコード生成のために別のCodex CLIを起動しません。どちらもCodexのModelメニューへJevを登録する機能ではありません。
+DesktopとClaude Codeは、コード生成のために別のコーディングエージェントを起動しません。どの方式も、ホストのモデルメニューへJevを登録する機能ではありません。
 
 ## はじめに
 
-必要なのはPython **3.10以上**、Git、自分のTypeSafe APIキー、Codexです。追加Pythonライブラリは不要です。ローカル実動作の確認環境はmacOS・Python 3.14・Codex CLI 0.153.2です。他のOSやCodexバージョンの動作をこの測定で保証するものではありません。CLI生成には自分のCodexアカウントで`gpt-6-astra`を利用でき、`codex sandbox`が動く必要があります。使用するCodexのフラグはバージョンに依存します。
+必要なのはPython **3.10以上**、Git、利用するホストです。Codex方式にはCodex、Claude SkillにはClaude Codeを使います。実際にJevへ照会する場合は自分のTypeSafe APIキーが必要で、ローカル選別では不要です。追加Pythonライブラリは不要です。Codexの測定環境はmacOS・Python 3.14・Codex CLI 0.153.2です。他のOSやCodexバージョンの動作をこの測定で保証するものではありません。CLI生成には自分のCodexアカウントで`gpt-6-astra`を利用でき、`codex sandbox`が動く必要があります。使用するCodexのフラグはバージョンに依存します。
 
 ```sh
 git clone https://github.com/Oranquelui/astra-jev-harness.git
@@ -82,6 +86,18 @@ $astra-jev-coding この課題をAstra＋Jevで実装してください。対象
 ```
 
 Skillが課題・repo指示・送信対象を確認し、選別と鮮度確認を行った後、この会話で実装を続けます。Desktopプロセスからシェルの環境変数が見えない場合は、キー設定済みterminalでhelperを実行するか、任意のKeychain読み込みを使用してください。別terminalの`export`だけでは起動済みDesktopアプリの環境は変わりません。
+
+### Claude Codeで使う
+
+```sh
+python3 install.py --target claude-code --check
+python3 install.py --target claude-code
+python3 ~/.claude/skills/claude-jev-coding/scripts/context.py doctor
+```
+
+`~/.claude/skills`へ`claude-jev-coding`の参照リンクだけを作成します。プロジェクト単位で使う場合は`--skills-dir "/absolute/project/.claude/skills"`を指定します。上書き拒否・認証情報を扱わない点はDesktop版と同じで、何度実行しても結果は変わりません。`doctor`は`"surface": "claude-code"`とキーの有無を表示し、キーの値は表示しません。TypeSafeキーは自分のものを、環境変数または同じ任意のKeychain項目から使います。対象リポジトリでClaude CodeにJevで選別した変更を依頼するか、`/claude-jev-coding <課題>`で明示的に呼び出します。Skillはツールを事前承認せず、モデル・effortも変更せず、contextもforkしません。[Claude Codeの詳細](Claude%20Code/README.md)。
+
+2026-09-24にClaude Code 2.1.281で、Skillの検出・起動、plan/select/check/行範囲の読み取り、Claudeによる編集、テスト用コードの３件成功までローカルで確認しました。この確認は`--mode local`（Jev呼び出し０回）で行っており、Jev実接続やtoken削減のベンチマークではありません。ハーネス全体のオフラインテストは141件成功しています。
 
 ### CLIで試す：合成リポジトリ
 
@@ -214,7 +230,7 @@ flowchart LR
   F --> E[現在の会話で実装・テスト]
 ```
 
-`shared/`はTypeSafe通信・snapshot・選別・資格情報の取得、`Codex cli/`は生成・候補検証・適用、`Codex Desktop/`はcontext受け渡しとSkillを担当します。rootスクリプトは互換入口です。JevはNoulのyes/no形式で関連性を判断し、コードは生成しません。回数・パス等の制約はコードが管理します。
+`shared/`はTypeSafe通信・snapshot・選別・資格情報の取得、`Codex cli/`は生成・候補検証・適用、`shared/host_context.py`はホスト非依存のcontext受け渡し、`Codex Desktop/`と`Claude Code/`は薄いホスト用adapterとSkillを担当します。rootスクリプトは互換入口です。JevはNoulのyes/no形式で関連性を判断し、コードは生成しません。回数・パス等の制約はコードが管理します。
 
 ## 外部へ送信される情報
 
@@ -229,6 +245,7 @@ plan・candidate・runにはソースが入ります。対象repo外に保存し
 - 通常のPython `src`配置、ローカルTS alias・JSONC継承、`.mts`等を補完します。動的importや任意のビルド設定の解決は部分的です。
 - CLI検証は依存をインストールしません。成果物を書き込むビルドはread-only検証で動かない場合があります。指定テストの成功は全体の正しさの証明ではありません。
 - Desktopには自動モデル切替・会話圧縮・会話全体のトークン計測はありません。選択済みの会話モデルを使用します。
+- Claude Code Skillにはhook・MCPサーバー・会話圧縮・モデル/effortの変更はなく、Claude Codeの使用量も計測しません。token・費用への効果は未測定です。
 - 0.2/0.8の閾値は実験値であり、利用者のrepoの精度を保証しません。
 
 ## 関連プロジェクト
@@ -237,7 +254,7 @@ plan・candidate・runにはソースが入ります。対象repo外に保存し
 |---|---|---|
 | [hermes-jev-skills](https://github.com/kerpopule/hermes-jev-skills) | モデル切替、検索、Skill選択などのJev判断 | 判定/未判定の区別と、評価してから方式を変える方針を参考にした |
 | [jev-lint](https://github.com/mizchi/jev-lint) | 対象コードへの意味的なlint質問 | READMEの具体例、導入、実測、制限の書き方を参考にした。依存として同梱していない |
-| 本プロジェクト | Codexの2方式向けファイル選別 | CLIは生成・検証・適用。Desktopは現在の会話が実装 |
+| 本プロジェクト | Codex CLI・Codex Desktop・Claude Code向けファイル選別 | CLIは生成・検証・適用。DesktopとClaude Codeは現在の会話が実装 |
 
 同条件の性能比較ではありません。参考先のinstaller・plugin・ソースコードは同梱していません。[設計メモ](docs/DESIGN.md)。
 

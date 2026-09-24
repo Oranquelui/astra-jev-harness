@@ -1,5 +1,10 @@
 # Changelog / 変更履歴
 
+## Unreleased
+
+- Add the `claude-jev-coding` Claude Code Skill (`Claude Code/`) and `install.py --target claude-code` (default `~/.claude/skills`; `--skills-dir` for project scope). The Desktop helper logic moved to the host-neutral `shared/host_context.py`. Desktop imports, artifacts and the default install behavior are unchanged. Claude Code artifacts record surface `claude-code` and are rejected by the other hosts, and the reverse also holds. No Claude Code token or cost measurement; no version change.
+- Claude Code用`claude-jev-coding` Skillと`install.py --target claude-code`を追加しました。Desktopの処理はホスト非依存の`shared/host_context.py`へ移し、既存の動作は維持しています。Claude Codeでの削減効果は未測定です。
+
 ## v0.3.1 — 2026-09-24
 
 - Rename the workflow directories to `Codex Desktop/` and `Codex cli/`; update launchers, quoted shell commands, and English/Japanese documentation links.

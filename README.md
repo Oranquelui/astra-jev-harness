@@ -2,7 +2,7 @@
 
 [日本語](README-ja.md) · [Version 0.3.1](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
 
-This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20Desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately.
+This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20Desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately. A separate **[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md) for Claude Code** (unreleased) applies the same context selection to the current Claude Code session.
 
 Narrow large repositories locally, let **Jev judge the bounded candidates**, then let **Astra write the code**.
 
@@ -15,6 +15,10 @@ A local coding harness for Codex CLI and Codex Desktop. Give it a task such as �
 ## v0.3.1: explicit workflow directories
 
 The implementation directories are now [`Codex Desktop/`](Codex%20Desktop/README.md) and [`Codex cli/`](Codex%20cli/README.md). Quote paths with spaces in shell commands. After updating an existing clone, rerun `python3 install.py` to migrate this clone's old Desktop Skill symlink. Other installed Skills are preserved. Root compatibility scripts and Python imports remain available. This packaging update makes no new token or cost claim.
+
+## Unreleased: Claude Code Skill
+
+[`Claude Code/`](Claude%20Code/README.md) adds a `claude-jev-coding` Skill and a thin helper over the same host-neutral selection core as Desktop (`shared/host_context.py`). Claude Code writes the code; Jev only judges file relevance. The helper never starts Codex or Astra. Its artifacts record surface `claude-code` and are rejected by the Desktop and CLI helpers, and the reverse also holds. This is an adaptation, **not a measured Claude Code token or cost reduction**. Version 0.3.1 and its Codex results are unchanged.
 
 ## What improved in v0.3.0?
 
@@ -33,19 +37,19 @@ Select original evaluation excerpts with source hashes and line numbers, retain 
 
 ## Pick your workflow
 
-| | Codex CLI | Codex Desktop app |
-|---|---|---|
-| Who writes code? | A separate Codex CLI process using Astra | The model in your current conversation; select Astra for the Astra workflow |
-| What does Jev do? | Selects context before generation | Selects files for the current conversation to read |
-| Workflow | `plan → run → verify → apply` | `plan → select → check → implement/test in the conversation` |
-| Target writes | Explicit `apply` after verification | Your normal Desktop editing tools |
-| Entrypoint | `python3 "Codex cli/main.py"` | `python3 "Codex Desktop/context.py"` or the Skill |
+| | Codex CLI | Codex Desktop app | Claude Code |
+|---|---|---|---|
+| Who writes code? | A separate Codex CLI process using Astra | The model in your current conversation; select Astra for the Astra workflow | The current Claude Code session, with its own model and effort |
+| What does Jev do? | Selects context before generation | Selects files for the current conversation to read | Selects files for the current session to read |
+| Workflow | `plan → run → verify → apply` | `plan → select → check → implement/test in the conversation` | Same as Desktop |
+| Target writes | Explicit `apply` after verification | Your normal Desktop editing tools | Claude Code's normal tools and permission prompts |
+| Entrypoint | `python3 "Codex cli/main.py"` | `python3 "Codex Desktop/context.py"` or the Skill | `python3 "Claude Code/context.py"` or `/claude-jev-coding` |
 
-Desktop does **not** spawn another Codex CLI to generate code. Neither workflow registers Jev as a model in Codex's Model menu.
+Desktop and Claude Code do **not** spawn another coding agent to generate code. No workflow registers Jev as a model in a host's model menu.
 
 ## Start here
 
-Requires Python **3.10+**, Git, your own TypeSafe API key, and Codex. No third-party Python runtime dependencies. Tested locally on macOS with Python 3.14 and Codex CLI 0.153.2; other platforms and Codex versions are not established by that measurement. CLI generation requires access to `gpt-6-astra` in your own Codex account and a working `codex sandbox` command. The included runtime flags are version-sensitive.
+Requires Python **3.10+**, Git, and the host you use: Codex for the Codex workflows, or Claude Code for the Claude Skill. Live Jev selection requires your own TypeSafe API key; local selection does not. No third-party Python runtime dependencies. Codex measurements were made locally on macOS with Python 3.14 and Codex CLI 0.153.2; other platforms and Codex versions are not established by that measurement. CLI generation requires access to `gpt-6-astra` in your own Codex account and a working `codex sandbox` command. The included runtime flags are version-sensitive.
 
 ```sh
 git clone https://github.com/Oranquelui/astra-jev-harness.git
@@ -82,6 +86,18 @@ $astra-jev-coding Fix this task with Astra + Jev in the current checkout.
 ```
 
 The Skill uses your task and repository instructions, reviews the files to send, selects context, checks freshness, and continues implementation in that conversation. If the Desktop process cannot see your shell environment, use the helper from a terminal with the key configured or the optional Keychain lookup; `export` in a separate terminal does not change an already-running app's environment.
+
+### Claude Code
+
+```sh
+python3 install.py --target claude-code --check
+python3 install.py --target claude-code
+python3 ~/.claude/skills/claude-jev-coding/scripts/context.py doctor
+```
+
+This links only `claude-jev-coding` into `~/.claude/skills`. For project scope, add `--skills-dir "/absolute/project/.claude/skills"`. The installer applies the same no-overwrite and no-credential rules as the Desktop install and is idempotent. `doctor` reports `"surface": "claude-code"` and key availability without printing the key. Use your own TypeSafe key, from the environment or the same optional Keychain item. In the target repository, ask Claude Code for a Jev-selected change, or invoke the Skill explicitly with `/claude-jev-coding <task>`. The Skill does not pre-approve tools, change the model or effort, or fork context. [Claude Code details](Claude%20Code/README.md).
+
+Locally verified on 2026-09-24 with Claude Code 2.1.281: Skill discovery and invocation, then plan/select/check/bounded read, native editing and three passing fixture tests. This acceptance check used `--mode local` (zero Jev calls); it is not a live-Jev or token-savings benchmark. The full offline harness suite passes 141 tests.
 
 ### CLI: an isolated example
 
@@ -214,7 +230,7 @@ flowchart LR
   F --> E[Current conversation edits and tests]
 ```
 
-`shared/` owns TypeSafe transport, snapshots, selection, and credential lookup. `Codex cli/` owns generation, candidate verification, and apply. `Codex Desktop/` owns the context handoff and Skill. Root scripts remain compatibility entrypoints. Jev answers Noul yes/no relevance questions; it does not generate code. Code enforces limits and paths.
+`shared/` owns TypeSafe transport, snapshots, selection, and credential lookup. `Codex cli/` owns generation, candidate verification, and apply. `shared/host_context.py` owns the host-neutral context handoff. `Codex Desktop/` and `Claude Code/` hold thin host adapters and their Skills. Root scripts remain compatibility entrypoints. Jev answers Noul yes/no relevance questions; it does not generate code. Code enforces limits and paths.
 
 ## What leaves your machine
 
@@ -229,6 +245,7 @@ Plans, candidates, and run files contain source text. Store them outside the tar
 - Dependency discovery is partial. Conventional Python `src` roots, local TS aliases and `.mts` are supported; dynamic imports and arbitrary build configurations remain partial.
 - CLI verification does not install dependencies; read-only verification may not support builds that write artifacts. Passing supplied tests is not proof of complete correctness.
 - Desktop has no automatic model routing, conversation compaction, or total-session token meter. The current model remains the model you selected.
+- The Claude Code Skill has no hooks, MCP server, conversation compaction, or model/effort override, and it does not measure Claude Code usage. Its token and cost effect has not been measured.
 - Experimental thresholds (0.2/0.8) are not calibrated guarantees for your repository.
 
 ## Related projects
@@ -237,7 +254,7 @@ Plans, candidates, and run files contain source text. Store them outside the tar
 |---|---|---|
 | [hermes-jev-skills](https://github.com/kerpopule/hermes-jev-skills) | Jev-based agent decisions including routing, retrieval, and skill selection | Informed our explicit judgment coverage and evaluation-first policy comparison |
 | [jev-lint](https://github.com/mizchi/jev-lint) | Semantic lint questions over matched code | Informed the README's concrete examples, setup, measured results, and limitations; not bundled |
-| This project | File-context selection for two Codex coding workflows | Generation/verification/apply in CLI; native conversation implementation in Desktop |
+| This project | File-context selection for Codex CLI, Codex Desktop and Claude Code | Generation/verification/apply in CLI; native conversation implementation in Desktop and Claude Code |
 
 This is not a head-to-head performance comparison. No installer, plugin, or source code from those repositories is bundled. [Design notes](docs/DESIGN.md).
 

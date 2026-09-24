@@ -1,8 +1,8 @@
 # Credentials and source data
 
-Each user supplies their own `TYPESAFE_API_KEY` and their own Codex authentication. This repository ships neither. Never submit real keys, tokens, cookies, `auth.json`, session exports, or private source files in issues or pull requests.
+Each user supplies their own `TYPESAFE_API_KEY` for live Jev calls and their own authentication for the host they use (Codex or Claude Code). This repository ships neither. Never submit real keys, tokens, cookies, `auth.json`, session exports, or private source files in issues or pull requests.
 
-- `install.py` links the Desktop Skill to the user's clone. It does not read, copy, or configure login data and refuses to overwrite a different Skill.
+- `install.py` links the Desktop Skill, or with `--target claude-code` the Claude Code Skill, to the user's clone. It does not read, copy, or configure login data and refuses to overwrite a different Skill.
 - Key resolution: existing environment first; on macOS, optional login Keychain service `astra-jev-harness`, account `TYPESAFE_API_KEY`. Keychain values are captured in memory. No `.env` discovery or copying from another project.
 - TypeSafe requests use the official HTTPS origin. Redirects are refused. Provider error bodies and headers are not logged. `doctor` shows availability and source only.
 - CLI Astra generation uses the user's existing Codex login and strips `TYPESAFE_API_KEY`, `OPENAI_API_KEY`, and `CODEX_API_KEY` from its child environment. This is not an export of the login. Codex still reads its own locally managed authentication as normal.
