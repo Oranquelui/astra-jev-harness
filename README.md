@@ -1,24 +1,24 @@
-# Astra + Jev: Codex Agent Skill and CLI Harness
+# Astra + Jev: Codex and Claude Code Agent Skills
 
-[日本語](README-ja.md) · [Version 0.3.1](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
+[日本語](README-ja.md) · [Version 0.4.0](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
 
-This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20Desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately. A separate **[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md) for Claude Code** (unreleased) applies the same context selection to the current Claude Code session.
+This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20Desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately. A separate **[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md) for Claude Code** applies the same context selection to the current Claude Code session.
 
-Narrow large repositories locally, let **Jev judge the bounded candidates**, then let **Astra write the code**.
+Narrow large repositories locally, let **Jev judge the bounded candidates**, then let **your coding model write the code**.
 
-A local coding harness for Codex CLI and Codex Desktop. Give it a task such as “fix pagination without changing the public API”; it snapshots eligible files, locally narrows oversized repositories, asks Jev which candidates the coding model needs, preserves dependencies, and records what was kept and why.
+A local coding harness for Codex CLI, Codex Desktop and Claude Code. Give it a task such as “fix pagination without changing the public API”; it snapshots eligible files, locally narrows oversized repositories, asks Jev which candidates the coding model needs, preserves dependencies, and records what was kept and why.
 
-**Goal:** reduce Astra token consumption and combined inference cost while preserving coding correctness and avoiding extra turnaround time. File selection is a means to that goal.
+**Goal:** reduce Astra token consumption and combined inference cost while preserving coding correctness and avoiding extra turnaround time. File selection is a means to that goal. The Claude Code Skill extends the same goal to Claude; its savings are not yet measured.
 
 **Experimental.** One synthetic CLI coding task at **Astra Extra High (`xhigh`)** used **27.0% fewer Astra input tokens** and **27.2% less at equivalent Standard API rates**, including Jev. Both modes passed the same six checks. Elapsed time was 7.3% shorter in this pair, but 34.6% longer in a separate `medium` pair. Each is one trial per mode, not a general speedup or Desktop result. [Measurements and limits](docs/BENCHMARKS.md).
+
+## v0.4.0: Claude Code Skill
+
+[`Claude Code/`](Claude%20Code/README.md) adds a `claude-jev-coding` Skill and a thin helper over the same host-neutral selection core as Desktop (`shared/host_context.py`). Claude Code writes the code; Jev only judges file relevance. The helper never starts Codex or Astra. Its artifacts record surface `claude-code` and are rejected by the Desktop and CLI helpers, and the reverse also holds. This is an adaptation, **not a measured Claude Code token or cost reduction**. The historical Codex measurements below are unchanged and do not establish Claude Code savings.
 
 ## v0.3.1: explicit workflow directories
 
 The implementation directories are now [`Codex Desktop/`](Codex%20Desktop/README.md) and [`Codex cli/`](Codex%20cli/README.md). Quote paths with spaces in shell commands. After updating an existing clone, rerun `python3 install.py` to migrate this clone's old Desktop Skill symlink. Other installed Skills are preserved. Root compatibility scripts and Python imports remain available. This packaging update makes no new token or cost claim.
-
-## Unreleased: Claude Code Skill
-
-[`Claude Code/`](Claude%20Code/README.md) adds a `claude-jev-coding` Skill and a thin helper over the same host-neutral selection core as Desktop (`shared/host_context.py`). Claude Code writes the code; Jev only judges file relevance. The helper never starts Codex or Astra. Its artifacts record surface `claude-code` and are rejected by the Desktop and CLI helpers, and the reverse also holds. This is an adaptation, **not a measured Claude Code token or cost reduction**. Version 0.3.1 and its Codex results are unchanged.
 
 ## What improved in v0.3.0?
 

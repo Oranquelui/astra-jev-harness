@@ -1,24 +1,24 @@
-# Astra + Jev：CodexエージェントスキルとCLIハーネス
+# Astra + Jev：Codex・Claude Code向けエージェントスキル
 
-[English](README.md) · [バージョン 0.3.1](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
+[English](README.md) · [バージョン 0.4.0](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
 
-このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](Codex%20Desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。別途、**Claude Code用の[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md)**（未リリース）を追加し、同じコンテキスト選別を現在のClaude Codeセッションで使えるようにしました。
+このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](Codex%20Desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。別途、**Claude Code用の[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md)**を追加し、同じコンテキスト選別を現在のClaude Codeセッションで使えるようにしました。
 
-**大きなrepoでは先に候補を絞り、Jevが候補を判断し、Astraがコードを書く。**
+**大きなrepoでは先に候補を絞り、Jevが候補を判断し、利用中のコーディングモデルがコードを書く。**
 
-Codex CLIとCodex Desktop向けのローカルCoding Harnessです。「公開APIを変えずにページングを修正して」といった課題から、対象ファイルをスナップショット化し、大きなrepoでは候補をローカルで絞ってからJevが関連性を判断します。依存ファイルを補い、何を残したか、その理由も記録します。
+Codex CLI・Codex Desktop・Claude Code向けのローカルCoding Harnessです。「公開APIを変えずにページングを修正して」といった課題から、対象ファイルをスナップショット化し、大きなrepoでは候補をローカルで絞ってからJevが関連性を判断します。依存ファイルを補い、何を残したか、その理由も記録します。
 
-**目的：** コードの正しさを保ちながら、Astraの消費tokenと推論全体の費用を減らし、完成までの時間・手戻りも抑えることです。ファイル選別はそのための手段です。
+**目的：** コードの正しさを保ちながら、Astraの消費tokenと推論全体の費用を減らし、完成までの時間・手戻りも抑えることです。ファイル選別はそのための手段です。Claude Code版も同じ目的をClaudeに広げますが、その削減効果は未測定です。
 
 **実験段階です。** **Astra Extra High（`xhigh`）**で合成CLI課題を修正・テストまで比較すると、**Astra入力27.0%減、Jev込みのStandard API単価換算27.2%減**でした。両方式とも同じ6件の確認に成功。所要時間はこの比較では7.3%減でしたが、別の`medium`比較では34.6%増でした。各方式1試行であり、一般的な高速化やDesktopでの効果は示しません。[測定条件と結果](docs/BENCHMARKS.md)。
+
+## v0.4.0：Claude Code Skill
+
+[`Claude Code/`](Claude%20Code/README.md)に、`claude-jev-coding` Skillと小さなhelperを追加しました。helperはDesktopと同じホスト非依存の選別コア（`shared/host_context.py`）を使います。コードを書くのはClaude Codeで、Jevはファイルの関連性だけを判定します。helperがCodexやAstraを起動することはありません。成果物にはsurface `claude-code`が記録され、Desktop・CLIのhelperはこれを受け付けません。逆方向も同様に拒否します。これは移植であり、**Claude Codeでのtoken・費用削減は測定していません**。下記の過去のCodex測定結果は変更しておらず、Claude Codeでの削減効果を示すものではありません。
 
 ## v0.3.1：方式が分かるディレクトリ名
 
 実装ディレクトリを[`Codex Desktop/`](Codex%20Desktop/README.md)と[`Codex cli/`](Codex%20cli/README.md)へ変更しました。シェルのコマンドでは空白を含むパスを引用符で囲みます。既存cloneの更新後に`python3 install.py`を再実行すると、このcloneを指す旧Desktop Skillリンクを移行します。他のSkillは保持します。rootの互換スクリプトとPython importは継続して使えます。今回の配布構成変更による新しいtoken・費用削減は主張しません。
-
-## 未リリース：Claude Code Skill
-
-[`Claude Code/`](Claude%20Code/README.md)に、`claude-jev-coding` Skillと小さなhelperを追加しました。helperはDesktopと同じホスト非依存の選別コア（`shared/host_context.py`）を使います。コードを書くのはClaude Codeで、Jevはファイルの関連性だけを判定します。helperがCodexやAstraを起動することはありません。成果物にはsurface `claude-code`が記録され、Desktop・CLIのhelperはこれを受け付けません。逆方向も同様に拒否します。これは移植であり、**Claude Codeでのtoken・費用削減は測定していません**。バージョン0.3.1とCodexの測定結果は変わりません。
 
 ## v0.3.0で何が改善したか
 

@@ -139,7 +139,7 @@ def request_jev(payload):
     body = json.dumps(payload, ensure_ascii=False).encode()
     req = urllib.request.Request("https://api.typesafe.ai/v1/systemone", data=body,
                                  headers={"Authorization": "Bearer " + key, "Content-Type": "application/json",
-                                          "User-Agent": "astra-jev-harness/0.3.1 (+https://github.com/Oranquelui/astra-jev-harness)"})
+                                          "User-Agent": "astra-jev-harness/0.4.0 (+https://github.com/Oranquelui/astra-jev-harness)"})
     start = time.monotonic()
     def failed(kind, code=None):
         return ProtocolError(f'TypeSafe {kind}' + (f' HTTP {code}' if code else '') + '; no automatic retry',
