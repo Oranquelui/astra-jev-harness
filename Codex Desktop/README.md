@@ -4,6 +4,8 @@
 
 Python 3.10以降とGitを使用し、追加Pythonライブラリは不要です。下記はリポジトリルートから実行します。
 
+長い進捗ログには、任意の[コマンド出力選別](../docs/TOOL-OUTPUT.md)も使えます。Skillの`scripts/output.py`から明示的に実行し、原文をGit外へ保存してJevで選別します。会話履歴の圧縮や全コマンドへの自動適用ではありません。
+
 ```sh
 python3 "Codex Desktop/context.py" doctor
 python3 "Codex Desktop/context.py" plan --repo /absolute/target/repo \

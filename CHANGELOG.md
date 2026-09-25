@@ -1,9 +1,17 @@
 # Changelog / 変更履歴
 
-## Unreleased
+## v0.5.0 — 2026-09-25
+
+- Add an opt-in, dependency-free Python wrapper for Desktop and normal Codex CLI sessions. Archive eligible stdout outside Git, retain verbatim required/uncertain/unjudged content, cap requests and preserve command failures, exit status and signals. No transcript scraping, auto-hooks or credential forwarding to the wrapped command.
+- Synthetic smoke check: stdout 19,885 → 7,601 bytes (61.8% less); required facts 5/5; exact original archived; Jev 2 calls / 7,172 input / 195 output tokens. This does not establish Astra usage, total-cost or coding-speed savings.
+- Desktop・通常のCodex CLI向けに任意の進捗ログ選別を追加。原文をGit外へ保存し、必要・不確実・未判定の情報、失敗時出力、終了コード・シグナルを保持します。会話履歴の収集・自動フック・子コマンドへのJevキー転送は行いません。
+- 合成ログ1件のstdoutは61.8%減、必須情報5/5を保持。Astra全体・総費用・実装速度の削減とは分けて記録します。
 
 - CLI generation now resolves the configured model/effort through Codex before Jev selection and forwards only those settings into the isolated generation process. Missing settings use Codex defaults; configuration errors and unsupported custom providers/profiles fail closed. Requested settings are distinct from unknown serving-model identity, preventing cost attribution to a hardcoded Astra model. Historical benchmark settings/results are unchanged.
 - CLI生成のモデル・推論強度をCodex設定から継承します。設定はJev選別前に確認し、取得失敗・未対応の独自プロバイダー/profileでは停止します。実応答モデルを確認できない場合の費用は不明とし、過去の測定結果と区別します。
+
+- Validation: 171 offline tests passed; installed Desktop Skill entrypoints and existing Keychain credential availability verified. Live synthetic output selection: 2 Jev calls, no extra coding agent.
+- 検証：オフライン171件成功。インストール済みDesktop Skillの起動と既存Keychain認証の有効性を確認。合成ログの実Jev選別は2回で、別のCoding Agentは起動していません。
 
 ## v0.4.0 — 2026-09-24
 

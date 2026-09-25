@@ -1,0 +1,29 @@
+{
+  "date": "2026-09-25",
+  "kind": "synthetic_tool_output_smoke",
+  "trials_per_mode": 1,
+  "model": "jev-1.13.0",
+  "fixture": "350 progress lines with a task-relevant destination and a pinned marker, followed by artifact/rollback/outcome",
+  "input_bytes": 19885,
+  "visible_stdout_bytes_including_footer": 7601,
+  "stdout_byte_reduction_percent": 61.78,
+  "required_facts_retained": 5,
+  "required_facts_total": 5,
+  "exact_archive_verified": true,
+  "jev_attempted_calls": 2,
+  "jev_completed_calls": 2,
+  "jev_input_tokens": 7172,
+  "jev_output_tokens": 195,
+  "selection_seconds": 1.2588191659888253,
+  "input_sha256": "eb77d43014c9b322ff17c8527c99368b1fe0def6cd971e20ced87b0df6e959de",
+  "visible_sha256": "de979d4203189d870244c78f9ca7d674c5ab9a78e66377c5aaf130c5cb9f8989",
+  "astra_tokens_saved": null,
+  "combined_cost_saved": null,
+  "coding_task_latency_change": null,
+  "limitations": [
+    "One synthetic output, not a coding benchmark or calibrated retention rate.",
+    "Bytes are not model tokens; host truncation and cache accounting are not measured.",
+    "Archive-path length affects the footer byte count.",
+    "Task brief explicitly describes required facts; no conversation transcript is read."
+  ]
+}

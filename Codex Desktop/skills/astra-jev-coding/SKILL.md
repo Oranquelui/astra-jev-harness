@@ -1,6 +1,6 @@
 ---
 name: astra-jev-coding
-description: "Codex Agent Skill for Astra + Jev coding in Codex Desktop. Jev selects repository context; the active conversation model implements and tests the change with native tools."
+description: "Codex Agent Skill for Astra + Jev coding in Codex Desktop. Jev selects repository context and optionally filters progress logs; the active conversation model implements and tests the change with native tools."
 ---
 
 # Astra + Jev in Codex Desktop
@@ -28,6 +28,12 @@ The helper does not implement `run`, `verify`, or `apply`. Those belong to the s
 ## Scope
 
 Snapshots include tracked and explicitly included untracked eligible UTF-8 files, up to 2 MB total, 1500 files, and 100 KB per file. Larger eligible repositories are narrowed locally to a bounded plan; this does not expand those snapshot limits. `--focus-file` cannot override eligibility or file-size checks. New plans split large files losslessly into bounded ranges; every range must be judged before a file can be dropped, and uncertainty/dependencies retain the whole file. A split file has no calibrated file-level probability. Request planning estimates serialized UTF-8 JSON bytes plus reserve against conservative 30k/60k budgets; it does not count exact Jev tokens. Old plans retain their original batching semantics. Read `docs/CONTEXT-BUDGETS.md` for limits, coverage and cache accounting. Lockfiles, credentials, generated/data directories, and unsupported extensions are excluded; review coverage before use. Local scoping can miss a required file, and smaller context does not establish Astra token savings or implementation quality. Keep the linked Harness checkout available while installed. Artifacts contain source text: store them outside the target repo, never add them to Git.
+
+## Optional progress-log selection
+
+For an explicitly authorized noninteractive command expected to produce long progress logs, use `python3 "<this-skill-directory>/scripts/output.py" --task-file <absolute-brief> --out <new-directory-outside-git> --max-calls 2 -- <executable> <args>`. Read `docs/TOOL-OUTPUT.md` in this checkout first. The brief must include current constraints and required facts; this wrapper does not read conversation history. Repeat `--keep-text <literal>` to pin required values. Keep ordinary execution for search results, source documents, structured data, interactive/streaming tools, or when output completeness is required.
+
+The wrapper executes the command once, retains original stderr/exit status, archives eligible stdout before inference, and omits only confidently irrelevant recognized progress chunks. Uncertain/unjudged content stays. Command/provider failures preserve original stdout; never rerun a side-effecting command just to recover output. Read the full-output archive directly instead. `auto` skips below 12,000 bytes; `local` is the no-Jev baseline. Default 2 / maximum 4 requests; no automatic retries. Announce the authorized output scope and call cap. The TypeSafe key is never forwarded to the child command. Artifacts stay outside Git. This is opt-in command routing, not automatic interception or history compaction. Report output bytes and Jev usage separately from unknown whole-session token/cost savings.
 
 ## Evidence and reuse
 

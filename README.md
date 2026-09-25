@@ -1,6 +1,6 @@
 # Astra + Jev: Codex and Claude Code Agent Skills
 
-[日本語](README-ja.md) · [Version 0.4.0](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
+[日本語](README-ja.md) · [Version 0.5.0](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
 
 This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20Desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately. A separate **[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md) for Claude Code** applies the same context selection to the current Claude Code session.
 
@@ -12,7 +12,13 @@ A local coding harness for Codex CLI, Codex Desktop and Claude Code. Give it a t
 
 **Experimental.** One synthetic CLI coding task at **Astra Extra High (`xhigh`)** used **27.0% fewer Astra input tokens** and **27.2% less at equivalent Standard API rates**, including Jev. Both modes passed the same six checks. Elapsed time was 7.3% shorter in this pair, but 34.6% longer in a separate `medium` pair. Each is one trial per mode, not a general speedup or Desktop result. [Measurements and limits](docs/BENCHMARKS.md).
 
-## Unreleased: inherit Codex CLI model settings
+## v0.5.0: optional progress-log selection
+
+The Desktop Skill now includes an explicit command wrapper: archive original stdout outside Git, ask Jev about fully visible progress chunks, and return verbatim retained lines with a recovery path. Diagnostics, required literals and uncertain/unjudged chunks stay; failures restore the original output. Normal Codex CLI sessions can invoke the same wrapper. It does not automatically intercept tools, compact history, or change the coding model.
+
+One synthetic log check reduced returned stdout from **19,885 to 7,601 bytes (61.8%)**, including omission markers and the archive footer, while retaining **5/5 required facts** and a byte-exact original. Jev made **2 calls: 7,172 input / 195 output tokens**. This is **not an Astra token, cost or completed-coding-task speedup measurement**. [Usage and boundaries](docs/TOOL-OUTPUT.md) · [Measured aggregate](benchmarks/tool-output-smoke.json).
+
+### Codex CLI model settings
 
 The CLI harness now forwards the configured `model` and `model_reasoning_effort`, rather than forcing Astra/Medium. Desktop and Claude Code harnesses continue using their active sessions. Only model settings are forwarded; generation isolation remains. Missing settings use Codex defaults. Custom providers and profile selection are not supported. Requested settings are recorded separately from unknown serving-model identity; no new token or cost saving is claimed. [Details and limits](docs/CLI.md#model-verification-and-limits).
 
