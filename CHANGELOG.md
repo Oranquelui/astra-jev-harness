@@ -1,5 +1,12 @@
 # Changelog / 変更履歴
 
+## v0.5.1 — 2026-09-27
+
+- Require valid Jev judgments through the Codex Desktop Skill's `select`, `check`, and `read` entrypoints. Reject local/auto bypasses before credentials or transmission, preserve matching cached judgments, and distinguish reuse from new API calls. Direct native-helper baselines remain available for explicit no-Jev requests; no silent fallback or automatic retry. Optional output selection and Claude Code behavior are unchanged. This fix makes no new token or cost-saving claim.
+- Codex Desktop Skillの`select`・`check`・`read`でJev判定を必須にし、localや小さい入力のautoによる省略を認証・送信前に拒否します。同一リクエストの有効な判定再利用は維持し、実API呼び出しと区別します。明示的なJevなしの依頼にはhelper直接実行を使えますが、黙った切替・自動再試行はしません。任意の出力選別とClaude Codeの動作は変更せず、新たなtoken・費用削減は主張しません。
+
+- Validation / 検証: 183 offline tests passed. A synthetic three-file check through the installed Desktop Skill completed plan/select/check/read with one live Jev call (960 input / 55 output tokens); exact-request reuse completed with zero additional calls. Local and small-auto bypasses and old local handoffs were rejected. These are integration checks, not savings measurements.
+
 ## v0.5.0 — 2026-09-25
 
 - Add an opt-in, dependency-free Python wrapper for Desktop and normal Codex CLI sessions. Archive eligible stdout outside Git, retain verbatim required/uncertain/unjudged content, cap requests and preserve command failures, exit status and signals. No transcript scraping, auto-hooks or credential forwarding to the wrapped command.

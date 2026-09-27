@@ -1,6 +1,6 @@
 # Astra + Jev：Codex・Claude Code向けエージェントスキル
 
-[English](README.md) · [バージョン 0.5.0](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
+[English](README.md) · [バージョン 0.5.1](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
 
 このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](Codex%20Desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。別途、**Claude Code用の[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md)**を追加し、同じコンテキスト選別を現在のClaude Codeセッションで使えるようにしました。
 
@@ -11,6 +11,12 @@ Codex CLI・Codex Desktop・Claude Code向けのローカルCoding Harnessです
 **目的：** コードの正しさを保ちながら、Astraの消費tokenと推論全体の費用を減らし、完成までの時間・手戻りも抑えることです。ファイル選別はそのための手段です。Claude Code版も同じ目的をClaudeに広げますが、その削減効果は未測定です。
 
 **実験段階です。** **Astra Extra High（`xhigh`）**で合成CLI課題を修正・テストまで比較すると、**Astra入力27.0%減、Jev込みのStandard API単価換算27.2%減**でした。両方式とも同じ6件の確認に成功。所要時間はこの比較では7.3%減でしたが、別の`medium`比較では34.6%増でした。各方式1試行であり、一般的な高速化やDesktopでの効果は示しません。[測定条件と結果](docs/BENCHMARKS.md)。
+
+## v0.5.1：Desktop SkillでJev判定を必須化
+
+`astra-jev-coding`を指定しても、`--mode local`でJev判定なしに選別が完了してしまう問題を修正しました。Skillの入口は`select`・`check`・`read`で有効なJev判定を確認します。localや小さい入力のautoによる省略はキー取得・API送信前に拒否し、過去のローカル選別結果も受け付けません。同一リクエストの判定再利用は維持し、新規API呼び出しと区別します。通常helperの明示的な比較モード、Claude Codeの既定動作、任意の進捗ログ選別は維持します。
+
+検証は**オフライン183件成功**。インストール済みSkillから合成3ファイルのplan/select/check/readを通し、**Jev実API 1回（入力960・出力55 tokens）**で成功しました。同じ判定の再利用は**追加API 0回**でした。今回は実行の正しさを直した版で、**新たなToken・費用削減効果を主張するものではありません**。[更新の詳細](Codex%20Desktop/README.md) · [変更履歴](CHANGELOG.md)。
 
 ## v0.5.0：任意の進捗ログ選別
 
@@ -36,7 +42,7 @@ CLIハーネスはAstra・Mediumへの固定をやめ、設定された`model`�
 |---|---|---|
 | 22 KB超の適格ファイル | Jevで判定せず保持 | 全範囲を予算内で分割判定。不確実・判定漏れがあれば全文保持 |
 | Desktopへの引き渡し | Skillが選択済み全文を読む | 本文を会話へ出す前に選別し、必要な行だけ読む |
-| 小さいDesktop課題 | 判定可能なファイルがあれば`select`でJevを使う | Skillは`--mode auto`を推奨。本文12,000 bytes未満なら全候補保持・Jev 0回。コマンドの既定は`jev`を維持 |
+| 小さいDesktop課題 | 判定可能なファイルがあれば`select`でJevを使う | 直接実行するhelperは`--mode auto`に対応。本文12,000 bytes未満なら全候補保持・Jev 0回。既定は`jev`。現在のDesktop SkillはJev判定を必須とする |
 | 使用量・費用 | プロバイダー別token合計。費用見積なし | 通常入力・cache read/write・不明分を分離。任意のモデル別単価で見積 |
 
 Codex Desktop Skillを更新し、全範囲判定と集計はCLIでも使えます。旧planの再現性は維持します。同じJevリクエストの応答再利用はv0.1.0からの機能であり、**v0.3.0で新たに得た節約効果には数えません**。[更新の詳細](docs/CONTEXT-BUDGETS.md) · [変更履歴](CHANGELOG.md)。
@@ -97,6 +103,10 @@ $astra-jev-coding この課題をAstra＋Jevで実装してください。対象
 
 Skillが課題・repo指示・送信対象を確認し、選別と鮮度確認を行った後、この会話で実装を続けます。Desktopプロセスからシェルの環境変数が見えない場合は、キー設定済みterminalでhelperを実行するか、任意のKeychain読み込みを使用してください。別terminalの`export`だけでは起動済みDesktopアプリの環境は変わりません。
 
+Desktop Skillの呼び出しはJev選別を使う依頼として扱います。入口が`select`・`check`・`read`へ`--require-jev`を付けるため、通常は`--mode jev`で実行します。`local`と小さい入力の`auto`はキー取得・API呼び出し・出力作成の前に拒否し、Jev判定のない受け渡しも拒否します。有効な同一リクエストのキャッシュは利用でき、再利用件数と新しいAPI呼び出し件数を分けて報告します。キー不足やAPI失敗を理由にlocalへ黙って切り替えたり、記録を確認せず再実行したりしません。この確認はSkillの入口に適用され、会話中の全ツールを自動制御するものではありません。
+
+開発ファイルの選別と、製品の実行時に有料モデルを呼ぶ処理は別の範囲です。ただし、すべての外部送信・有料呼び出しを禁じる指示は守ります。利用者がJevなしの比較・オフライン作業を明示的に求めた場合は、下記のhelperを直接使い、その方式を明記します。任意の`output.py`の動作は変わりません。[Desktopの詳細](Codex%20Desktop/README.md) · [v0.5.1の変更](CHANGELOG.md)。
+
 ### Claude Codeで使う
 
 ```sh
@@ -135,7 +145,7 @@ python3 "Codex cli/main.py" apply --run "$DEMO_ROOT/run"
 
 ## 特徴
 
-本文を会話へ読む前に選別し、`read --selection /absolute/selection --path src/main.py --start-line 1 --end-line 80`で必要行だけ取得できます。`select --mode auto`は12,000本文bytes未満ならJevを省略、`--mode local`は明示的に省略します（既定は`jev`）。cache read/writeの集計と任意単価での費用見積を追加しました。[動作・制限](docs/CONTEXT-BUDGETS.md)。
+本文を会話へ読む前に選別し、`read --selection /absolute/selection --path src/main.py --start-line 1 --end-line 80`で必要行だけ取得できます。明示的に求められた方式比較では、helperの直接実行で`select --mode auto`を使えます。本文12,000 bytes未満ならJevを省略しますが、それ以上では呼び出す場合があります。オフライン・Jevなしの比較を求められた場合は、常に省略する`--mode local`を使います。既定は`jev`です。これらの省略はDesktop SkillでのJev利用の代わりにはなりません。cache read/writeの集計と任意単価での費用見積を追加しました。[動作・制限](docs/CONTEXT-BUDGETS.md)。
 
 - **上限のある選別**：対象ファイルの全範囲を分割し、質問を含む予算内でバッチにまとめます。不確実な判断ではコンテキストを残し、解決できるPython/相対JavaScript依存、設定、repo指示を補います。
 - **判定の可視化**：範囲ごとの確率・ファイルの保持理由・判定漏れ・本文バイト数を記録します。関連性は安全性の判定ではありません。
@@ -145,6 +155,7 @@ python3 "Codex cli/main.py" apply --run "$DEMO_ROOT/run"
 - **失敗の記録**：サービスの自動再試行はありません。CLIは全候補を含むAstraプロンプトをシリアライズして500,000バイト上限をJev呼び出し前に確認します。Desktopは試行/完了を保存し、同一出力先の再利用を拒否します。応答のない試行も課金される可能性があります。
 
 ```sh
+# 明示的に依頼されたauto方式の比較。Skillの入口ではなくhelperを直接実行します。
 python3 "Codex Desktop/context.py" plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan
 python3 "Codex Desktop/context.py" select --plan /absolute/plan \

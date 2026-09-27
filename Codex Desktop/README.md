@@ -36,6 +36,10 @@ python3 "Codex Desktop/context.py" plan --repo /absolute/target/repo \
 
 ## Skillと資格情報
 
+Skillの呼び出しは、開発用のJev選別を使う依頼として扱います。Skillの`scripts/context.py`は`select`・`check`・`read`へ`--require-jev`を付け、Jevを使わない選別経路や、Jev判定のない受け渡しを拒否します。通常は`--mode jev`で実行します。`local`と小さい入力の`auto`は、キー取得・API呼び出し・出力作成の前に拒否されます。有効な同一リクエストのキャッシュは利用できますが、再利用件数と実API呼び出し件数を分けて報告します。
+
+製品の実行時に有料モデルを呼ばないという制約と、許可済みの開発ファイル選別は別の範囲です。ただし、すべての外部送信・有料呼び出しを禁じる指示は守ります。認証不足やAPI失敗を理由にlocalへ黙って切り替えたり、記録を確認せず再実行したりしません。この確認はSkillの入口に適用され、会話全体のツールを自動的に制御するものではありません。任意の`output.py`の動作は変わりません。
+
 `Codex Desktop/skills/astra-jev-coding`をユーザーのSkillディレクトリから参照します。インストール済みSkillの`python3 ~/.codex/skills/astra-jev-coding/scripts/context.py doctor`（`CODEX_HOME`を変更した場合は対応するパス）はsymlinkを解決して、このcheckoutの入口を使います。v0.3.0以前から更新した場合は`python3 install.py`を再実行すると、このcloneを指す旧リンクを移行します。checkoutを削除・移動する際は参照も更新してください。
 
 `TYPESAFE_API_KEY`を優先し、未設定のmacOS環境ではlogin Keychainのservice `astra-jev-harness` / account `TYPESAFE_API_KEY`から取得します。キー値を出力せず、helperプロセス内だけで使います。`doctor`は外部APIを呼びません。plan/check/ヘルプはKeychainを読みません。
@@ -75,4 +79,4 @@ python3 "Codex Desktop/context.py" select --plan /absolute/context-plan \
 
 ## 本文の読み方と呼び出し省略
 
-本文を会話へ出す前にplan/selectを実行します。`select --mode auto`は12,000本文bytes未満なら全候補を保持してJevを省略、`--mode local`は明示的に省略します。既定は`jev`です。`read`は鮮度確認後に80行既定・最大200行/24 KBを返し、APIを呼びません。通常入力・cache read/write・料金見積の区別と分割の仕様は[共通ガイド](../docs/CONTEXT-BUDGETS.md)を参照してください。
+本文を会話へ出す前にplan/selectを実行します。利用者がJevなしの比較・オフライン作業を明示的に求めた場合は、Skillの入口ではなく、このcheckoutの`Codex Desktop/context.py`を直接使います。オフライン・Jevなしを保証する場合は`--mode local`を使います。明示的な方式比較には`select --mode auto`も使えますが、12,000本文bytes未満では全候補を保持してJevを省略し、それ以上では呼び出す場合があります。既定は`jev`です。これらの省略はJev利用の依頼を満たすものではありません。`read`は鮮度確認後に80行既定・最大200行/24 KBを返し、APIを呼びません。通常入力・cache read/write・料金見積の区別と分割の仕様は[共通ガイド](../docs/CONTEXT-BUDGETS.md)を参照してください。

@@ -1,6 +1,6 @@
 # Astra + Jev: Codex and Claude Code Agent Skills
 
-[日本語](README-ja.md) · [Version 0.5.0](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
+[日本語](README-ja.md) · [Version 0.5.1](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
 
 This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20Desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately. A separate **[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md) for Claude Code** applies the same context selection to the current Claude Code session.
 
@@ -11,6 +11,12 @@ A local coding harness for Codex CLI, Codex Desktop and Claude Code. Give it a t
 **Goal:** reduce Astra token consumption and combined inference cost while preserving coding correctness and avoiding extra turnaround time. File selection is a means to that goal. The Claude Code Skill extends the same goal to Claude; its savings are not yet measured.
 
 **Experimental.** One synthetic CLI coding task at **Astra Extra High (`xhigh`)** used **27.0% fewer Astra input tokens** and **27.2% less at equivalent Standard API rates**, including Jev. Both modes passed the same six checks. Elapsed time was 7.3% shorter in this pair, but 34.6% longer in a separate `medium` pair. Each is one trial per mode, not a general speedup or Desktop result. [Measurements and limits](docs/BENCHMARKS.md).
+
+## v0.5.1: require Jev judgments in the Desktop Skill
+
+Fix a workflow where invoking `astra-jev-coding` could still finish context selection with `--mode local` and no Jev judgment. The Skill entrypoint now requires validated Jev judgments for `select`, `check`, and `read`. Local or small-context auto skips fail before credentials or transmission; previously saved local handoffs are also rejected. Matching cached judgments remain valid and are reported separately from new API calls. Direct native helpers retain explicit baseline modes; Claude Code defaults and optional progress-log selection are unchanged.
+
+Validation: **183 offline tests passed**. An installed-Skill check on a synthetic three-file repository completed plan/select/check/read with **one Jev call (960 input / 55 output tokens)**; reusing the same judgments required **zero additional API calls**. This release fixes execution correctness and makes **no new token or cost-saving claim**. [Upgrade details](Codex%20Desktop/README.md) · [Changelog](CHANGELOG.md).
 
 ## v0.5.0: optional progress-log selection
 
@@ -36,7 +42,7 @@ The implementation directories are now [`Codex Desktop/`](Codex%20Desktop/README
 |---|---|---|
 | Eligible files larger than 22 KB | Retained without a Jev judgment | Every range is judged within a request budget; uncertainty or missing coverage retains the whole file |
 | Desktop handoff | Skill reads the full selected context | Skill selects before loading implementation bodies, then reads needed line ranges |
-| Small Desktop tasks | `select` always uses Jev when there are judgeable files | Skill recommends `--mode auto`: below 12,000 source bytes, retain candidates with zero Jev calls; command default remains `jev` |
+| Small Desktop tasks | `select` always uses Jev when there are judgeable files | Native helper supports `--mode auto`: below 12,000 source bytes, retain candidates with zero Jev calls; command default remains `jev`. The current Desktop Skill requires Jev judgments |
 | Usage and cost | Provider token totals; no price estimate | Separate ordinary input, cache reads/writes and unknowns; optional exact-model price estimates |
 
 These changes apply to the Codex Desktop Skill; complete-range selection and accounting also support CLI. Existing plans keep their replay behavior. Exact-request Jev response reuse already existed in v0.1.0 and is **not a new v0.3.0 saving**. [Upgrade details](docs/CONTEXT-BUDGETS.md) · [Changelog](CHANGELOG.md).
@@ -97,6 +103,10 @@ $astra-jev-coding Fix this task with Astra + Jev in the current checkout.
 
 The Skill uses your task and repository instructions, reviews the files to send, selects context, checks freshness, and continues implementation in that conversation. If the Desktop process cannot see your shell environment, use the helper from a terminal with the key configured or the optional Keychain lookup; `export` in a separate terminal does not change an already-running app's environment.
 
+Invoking the Desktop Skill requests Jev selection. Its launcher enforces `--require-jev` on `select`, `check`, and `read`; use `--mode jev`. It rejects `local` and small-context `auto` before credentials, API calls, or output creation, and refuses handoffs without valid Jev judgments. Matching cached judgments remain usable; report reused judgments separately from new API calls. A missing key or provider failure must not silently switch the workflow to local selection or trigger a blind retry. These checks apply to this Skill's entrypoint, not every tool in the conversation.
+
+Development selection and the product runtime's paid-model calls have separate scopes; an explicit ban on all external or paid calls still applies. For a user-requested no-Jev baseline/offline run, use the direct native helper described below and label it as such. The optional `output.py` behavior is unchanged. [Desktop details](Codex%20Desktop/README.md) · [v0.5.1 changes](CHANGELOG.md).
+
 ### Claude Code
 
 ```sh
@@ -135,7 +145,7 @@ python3 "Codex cli/main.py" apply --run "$DEMO_ROOT/run"
 
 ## What it does
 
-Select before loading bodies into the conversation, then use `read --selection /absolute/selection --path src/main.py --start-line 1 --end-line 80` for needed ranges. `select --mode auto` skips Jev under 12,000 source bytes; `--mode local` explicitly bypasses it (default remains `jev`). Measurement separates cache reads/writes and supports supplied model-specific price estimates. [Behavior and limits](docs/CONTEXT-BUDGETS.md).
+Select before loading bodies into the conversation, then use `read --selection /absolute/selection --path src/main.py --start-line 1 --end-line 80` for needed ranges. For explicitly requested mode comparisons, the direct native helper retains `select --mode auto`: it skips Jev under 12,000 source bytes but may call Jev for larger inputs. Use `--mode local` for an explicitly requested offline/no-Jev baseline; default remains `jev`. These bypass modes are not a substitute for the Desktop Skill's Jev workflow. Measurement separates cache reads/writes and supports supplied model-specific price estimates. [Behavior and limits](docs/CONTEXT-BUDGETS.md).
 
 - **Bounded selection.** Complete eligible sources are split into bounded ranges and grouped with their questions into requests. Uncertain judgments preserve context. Resolvable Python/relative JavaScript dependencies, configuration, and repository instructions are retained.
 - **Visible decisions.** Source-range probabilities, per-file retention reasons, incomplete judgments, and before/after source bytes are recorded. Relevance is not a security verdict.
@@ -145,6 +155,7 @@ Select before loading bodies into the conversation, then use `read --selection /
 - **Explicit failures.** No automatic service retries. CLI checks the serialized worst-case Astra prompt against its 500,000-byte limit before any Jev call. Desktop records attempted and completed requests and refuses to reuse an output directory. Failed requests may still be billable.
 
 ```sh
+# Direct helper: an explicitly requested auto-mode comparison, not the Skill entrypoint.
 python3 "Codex Desktop/context.py" plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan
 python3 "Codex Desktop/context.py" select --plan /absolute/plan \

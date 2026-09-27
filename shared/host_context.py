@@ -18,6 +18,30 @@ from shared.jev import ProtocolError, failure_record, read_cache, jev_request
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class JevRequiredError(ProtocolError):
+    """A requested Jev workflow must not become a local-only handoff."""
+
+
+JEV_REQUIRED_MESSAGE = (
+    'Jev selection required: use a bounded select --mode jev and verify its saved judgments. '
+    'Local or skipped selection is not Jev usage. Use the native helper for a no-Jev '
+    'baseline only when the user explicitly requests one.')
+
+
+def require_jev_selection(plan, record):
+    """Validate judgments, including cache reuse; attempts alone prove nothing."""
+    if record.get('route') != 'jev' or not record.get('jev_calls'):
+        raise JevRequiredError(JEV_REQUIRED_MESSAGE)
+    replay = rc.resolve_selection(plan, record['jev_calls'], record.get('policy', 'batch'))
+    if not replay['metrics']['judged_fragments']:
+        raise JevRequiredError(JEV_REQUIRED_MESSAGE)
+
+
+def jev_call_counts(record):
+    return {'jev_completed_calls': sum(not c.get('reused', False) for c in record['jev_calls']),
+            'jev_reused_calls': sum(bool(c.get('reused')) for c in record['jev_calls'])}
+
+
 def write_json(path, value):
     temporary = path.with_suffix('.tmp')
     temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
@@ -71,7 +95,8 @@ def make_plan(host, repo, task, out, include_paths=None, focus_paths=None, scope
     return plan
 
 
-def select(host, plan_dir, out, max_calls=4, policy='batch', cache_dir=None, evidence_dir=None, mode='jev'):
+def select(host, plan_dir, out, max_calls=4, policy='batch', cache_dir=None, evidence_dir=None,
+           mode='jev', require_jev=False):
     if policy not in rc.SELECTION_POLICIES:
         raise ProtocolError('Unknown selection policy')
     plan_dir, out = Path(plan_dir).resolve(), Path(out).resolve()
@@ -89,6 +114,8 @@ def select(host, plan_dir, out, max_calls=4, policy='batch', cache_dir=None, evi
         raise ProtocolError('Cache must be outside the source repository')
     # repo_context names the no-Jev route 'astra'; hosts record their own label.
     route = rc.selection_route(plan, 'astra' if mode == 'local' else mode)
+    if require_jev and (route != 'jev' or not rc.jev_batches(plan)):
+        raise JevRequiredError(JEV_REQUIRED_MESSAGE)
     recorded_route = host.NO_JEV_ROUTE if route == 'astra' else route
     required = (sum(read_cache(jev_request(rc.selection_case(plan, batch)), cache_dir) is None
                     for batch in rc.jev_batches(plan)) if route == 'jev' else 0)
@@ -102,7 +129,8 @@ def select(host, plan_dir, out, max_calls=4, policy='batch', cache_dir=None, evi
     record = {'version': 1, 'surface': host.SURFACE, 'status': 'selecting',
               'plan_dir': str(plan_dir), 'plan_sha256': rc.digest((plan_dir / 'plan.json').read_bytes()),
               'max_calls': max_calls, 'planned_calls': required, 'attempted_calls': 0, 'policy': policy,
-              'jev_calls': [], **child_call_fields(host), 'selection_mode': mode, 'route': recorded_route}
+              'jev_calls': [], **child_call_fields(host), 'selection_mode': mode, 'route': recorded_route,
+              'require_jev': require_jev}
     write_json(result_path, record)
 
     def attempt():
@@ -119,6 +147,8 @@ def select(host, plan_dir, out, max_calls=4, policy='batch', cache_dir=None, evi
         if env.get('TYPESAFE_API_KEY'):
             os.environ['TYPESAFE_API_KEY'] = env['TYPESAFE_API_KEY']
         selected = rc.select(plan, route, on_call=completed, max_calls=max_calls, on_attempt=attempt, policy=policy, cache_dir=cache_dir)
+        if require_jev:
+            require_jev_selection(plan, record)
         host.fresh(plan)
         if rc.digest((plan_dir / 'plan.json').read_bytes()) != record['plan_sha256']:
             raise ProtocolError('Plan changed during selection')
@@ -152,6 +182,7 @@ def select(host, plan_dir, out, max_calls=4, policy='batch', cache_dir=None, evi
     (out / 'REPORT.md').write_text(
         f"# {host.LABEL} context selected\n\nFiles: {len(record['paths'])}/{len(plan['files'])}. "
         f"Jev completed calls: {sum(not c.get('reused', False) for c in record['jev_calls'])}; attempted: {record['attempted_calls']}. "
+        f"Reused Jev judgments: {jev_call_counts(record)['jev_reused_calls']}. Jev required: {require_jev}. "
         f'{child_line}\n\nThis is context selection, not implementation or verification. '
         'Read the metadata first, then use the read command for needed line ranges; do not dump context.json. '
         'Run check before edits. If the source changes, refresh the plan before selecting again. '
@@ -165,7 +196,7 @@ def select(host, plan_dir, out, max_calls=4, policy='batch', cache_dir=None, evi
     return record
 
 
-def check(host, selection_dir):
+def check(host, selection_dir, require_jev=False):
     selection_dir = Path(selection_dir).resolve()
     record = load_surface_record(selection_dir, host, ('selected',))
     plan_dir = Path(record['plan_dir'])
@@ -173,16 +204,21 @@ def check(host, selection_dir):
         raise ProtocolError('Context plan changed')
     if rc.digest((selection_dir / 'context.json').read_bytes()) != record['context_sha256']:
         raise ProtocolError('Selected context changed')
-    host.fresh(host.load_host_plan(plan_dir))
+    plan = host.load_host_plan(plan_dir)
+    host.fresh(plan)
+    require_jev = require_jev or record.get('require_jev', False)
+    if require_jev:
+        require_jev_selection(plan, record)
     if record.get('evidence_selection_dir'):
         from shared.evidence import check as check_evidence
         check_evidence(record['evidence_selection_dir'])
-    return {'status': 'fresh', **child_call_fields(host), 'target_writes': 0}
+    return {'status': 'fresh', **child_call_fields(host), 'target_writes': 0,
+            **({'require_jev': True, **jev_call_counts(record)} if require_jev else {})}
 
 
-def read_context(host, selection_dir, path, start_line=1, end_line=None):
+def read_context(host, selection_dir, path, start_line=1, end_line=None, require_jev=False):
     """Expose only a requested range after checking provenance and source freshness."""
-    host.check(selection_dir)
+    host.check(selection_dir, require_jev=require_jev)
     if type(start_line) is not int or start_line < 1:
         raise ProtocolError('Start line must be positive')
     end_line = start_line + 79 if end_line is None else end_line
@@ -264,13 +300,17 @@ def main(host, description=None, argv=None):
     p.add_argument('--policy', choices=rc.SELECTION_POLICIES, default='batch')
     p.add_argument('--mode', choices=('auto', 'jev', 'local'), default='jev',
                    help='auto keeps contexts under 12KB locally; local always skips Jev')
+    p.add_argument('--require-jev', action='store_true',
+                   help='Reject skipped/local selection; require completed or valid reused Jev judgments')
     p = sub.add_parser('check')
     p.add_argument('--selection', required=True)
+    p.add_argument('--require-jev', action='store_true', help='Require saved Jev judgments as well as freshness')
     p = sub.add_parser('read', help='Read a bounded selected source range after freshness checks')
     p.add_argument('--selection', required=True)
     p.add_argument('--path', required=True)
     p.add_argument('--start-line', type=int, default=1)
     p.add_argument('--end-line', type=int)
+    p.add_argument('--require-jev', action='store_true', help='Reject local-only handoffs before exposing source text')
     p = sub.add_parser('compare', help='Replay saved judgments without API calls or source writes')
     p.add_argument('--selection', required=True)
     p.add_argument('--required-file', action='append', default=[])
@@ -286,19 +326,23 @@ def main(host, description=None, argv=None):
                                   args.include_file, args.focus_file, args.scope_max_calls)
             result = {'status': 'planned', 'files': len(plan['files']), 'planned_calls': len(rc.jev_batches(plan))}
         elif args.command == 'select':
-            record = host.select(args.plan, args.out, args.max_calls, args.policy, args.cache_dir, args.evidence, args.mode)
+            record = host.select(args.plan, args.out, args.max_calls, args.policy, args.cache_dir, args.evidence,
+                                 args.mode, require_jev=args.require_jev)
             result = {'status': record['status'], 'selected_files': len(record['paths']), 'route': record['route'],
-                      'jev_completed_calls': sum(not c.get('reused', False) for c in record['jev_calls']),
-                      'jev_reused_calls': sum(bool(c.get('reused')) for c in record['jev_calls']),
+                      **jev_call_counts(record), 'require_jev': record['require_jev'],
                       **child_call_fields(host)}
         elif args.command == 'read':
-            result = host.read_context(args.selection, args.path, args.start_line, args.end_line)
+            result = host.read_context(args.selection, args.path, args.start_line, args.end_line,
+                                       require_jev=args.require_jev)
         elif args.command == 'compare':
             result = host.compare(args.selection, args.required_file)
         else:
-            result = host.check(args.selection)
+            result = host.check(args.selection, require_jev=args.require_jev)
         print(json.dumps(result))
         return 0
+    except JevRequiredError:
+        print(JEV_REQUIRED_MESSAGE, file=sys.stderr)
+        return 1
     except (ProtocolError, OSError, ValueError, KeyError, TypeError):
         # Keep error output independent of file contents and provider response bodies.
         print(f'{host.LABEL} context operation failed; inspect plan freshness, call budget, '
