@@ -32,17 +32,17 @@ def make_plan(repo, task, out, include_paths=None, focus_paths=None, scope_max_c
     return hc.make_plan(_host(), repo, task, out, include_paths, focus_paths, scope_max_calls)
 
 
-def select(plan_dir, out, max_calls=4, policy='batch', cache_dir=None, evidence_dir=None, mode='jev'):
-    return hc.select(_host(), plan_dir, out, max_calls, policy, cache_dir, evidence_dir, mode)
+def select(plan_dir, out, max_calls=4, policy='batch', cache_dir=None, evidence_dir=None, mode='jev', require_jev=False):
+    return hc.select(_host(), plan_dir, out, max_calls, policy, cache_dir, evidence_dir, mode, require_jev)
 
 
-def check(selection_dir):
-    return hc.check(_host(), selection_dir)
+def check(selection_dir, require_jev=False):
+    return hc.check(_host(), selection_dir, require_jev)
 
 
-def read_context(selection_dir, path, start_line=1, end_line=None):
+def read_context(selection_dir, path, start_line=1, end_line=None, require_jev=False):
     """Expose only a requested range after checking provenance and source freshness."""
-    return hc.read_context(_host(), selection_dir, path, start_line, end_line)
+    return hc.read_context(_host(), selection_dir, path, start_line, end_line, require_jev)
 
 
 def compare(selection_dir, required_paths=None):
