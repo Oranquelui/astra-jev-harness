@@ -275,3 +275,7 @@ plan・candidate・runにはソースが入ります。対象repo外に保存し
 ## ライセンス
 
 [MIT](LICENSE)。OpenAIやTypeSafeの公式製品ではありません。利用するプロバイダーのアクセス権と支払いは利用者自身が管理します。
+
+### 原文の提示上限・段階的発見・使用量統合
+
+DesktopとClaude Codeに[原文を返す`present`と段階的に探索する`discover`](docs/CONTEXT-VIEWS.md)を追加しました。保持済み全文を変えず、未提示・未判定を明示し、追加APIは呼びません。`measure.py`は認識済みtool-output記録も集計し、会話全体の欠測は不明のまま扱います。token・費用の削減効果は未測定です。[Python配布案](docs/PYTHON-DISTRIBUTION-PROPOSAL.md)は利用者によるPythonの別途準備を不要にする提案で、現行のインストールには引き続きPythonが必要です。

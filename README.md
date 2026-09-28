@@ -275,3 +275,7 @@ This is not a head-to-head performance comparison. No installer, plugin, or sour
 ## License
 
 [MIT](LICENSE). Independent project; not affiliated with OpenAI or TypeSafe. Provider access and billing remain each user's responsibility.
+
+### Bounded context views and usage integration
+
+Desktop and Claude Code now provide [source-first `present` and staged `discover`](docs/CONTEXT-VIEWS.md). They keep retained sources intact, expose unpresented/unjudged context and add no provider calls. `measure.py` now includes recognized tool-output receipts while preserving unknown whole-conversation usage. Token/cost savings remain unmeasured. [Python distribution proposal](docs/PYTHON-DISTRIBUTION-PROPOSAL.md) describes removing the user's separate Python setup; current installation still requires Python.
