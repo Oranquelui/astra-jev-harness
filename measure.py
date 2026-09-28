@@ -2,6 +2,7 @@
 """Compare saved whole-run records. Missing usage stays unknown; no provider calls."""
 import argparse
 import json
+import math
 from pathlib import Path
 from decimal import Decimal, InvalidOperation
 
@@ -94,29 +95,60 @@ def estimate_cost(calls, attempted, prices, cache_required):
             'complete': unknown == 0, 'basis': 'supplied_model_rates_not_invoice_or_subscription_usage'}
 
 
+def normalize_record(record):
+    """Recognize existing receipt families without interpreting arbitrary `calls`."""
+    if not isinstance(record, dict):
+        record = {}
+    kind, surface = record.get('kind'), record.get('surface')
+    if kind == 'tool-output' and type(record.get('version')) is int and record['version'] == 1:
+        family, a, j, ac, jc = 'tool-output', [], record.get('calls', []), 0, record.get('attempted_calls')
+    elif kind == 'evidence_selection':
+        family, a, j, ac, jc = 'evidence', [], record.get('jev_calls', []), 0, record.get('attempted_calls')
+    elif kind is None and surface in ('desktop', 'claude-code'):
+        family, a, j, ac, jc = surface, [], record.get('jev_calls', []), None, record.get('attempted_calls')
+    elif kind is None and surface in (None, 'cli') and 'astra_calls' in record:
+        family, a, j = 'cli', record['astra_calls'], record.get('completed_jev_calls', record.get('jev_calls', []))
+        ac, jc = record.get('attempted_astra_calls'), record.get('attempted_jev_calls')
+    else:
+        family, a, j, ac, jc = 'unknown', [], [], None, None
+
+    def calls_and_count(calls, count):
+        if not isinstance(calls, list):
+            return [], None
+        # Keep a malformed returned call as missing usage, never as zero spend.
+        calls = [c if isinstance(c, dict) else {} for c in calls]
+        return calls, count if type(count) is int and count >= 0 else None
+
+    a, ac = calls_and_count(a, ac)
+    j, jc = calls_and_count(j, jc)
+    return {'kind': family, 'astra': a, 'jev': j, 'acount': ac, 'jcount': jc,
+            'status': record.get('status', 'unknown'), 'seconds': record.get('seconds')}
+
+
 def summarize(paths, prices=None):
     if prices is not None:
         validate_prices(prices)
     # Duplicate artifacts must not count as extra runs.
     paths = list(dict.fromkeys(str(Path(p).resolve()) for p in paths))
-    records = [json.loads(Path(p).read_text()) for p in paths]
+    records = [normalize_record(json.loads(Path(p).read_text())) for p in paths]
     astra, jev = [], []
     acount, jcount = 0, 0
     seconds = []
     for r in records:
-        astra.extend(r.get('astra_calls', []))
-        jev.extend(r.get('completed_jev_calls', r.get('jev_calls', [])))
-        a = 0 if r.get('kind') == 'evidence_selection' else r.get('attempted_astra_calls')
+        astra.extend(r['astra'])
+        jev.extend(r['jev'])
+        a = r['acount']
         # Desktop records describe selection only, never the whole conversation.
         acount = None if acount is None or a is None else acount+a
-        j = r.get('attempted_jev_calls', r.get('attempted_calls'))
+        j = r['jcount']
         jcount = None if jcount is None or j is None else jcount+j
         seconds.append(r.get('seconds'))
-    if not any('astra_calls' in r for r in records):
+    if not any(r['kind'] == 'cli' for r in records):
         acount = None
     summary = {'record_count': len(records), 'statuses': [r.get('status', 'unknown') for r in records],
+            'record_kinds': [r['kind'] for r in records],
             'astra': provider(astra, acount), 'jev': provider(jev, jcount, cache_required=False),
-            'summed_run_seconds': sum(seconds) if all(type(s) in (int, float) and s >= 0 for s in seconds) else None,
+            'summed_run_seconds': sum(seconds) if all(type(s) in (int, float) and math.isfinite(s) and s >= 0 for s in seconds) else None,
             'quality': 'not_established_by_usage_or_exit_status', 'dollar_cost': None}
     if prices is not None:
         costs = {'astra': estimate_cost(astra, acount, prices, True),

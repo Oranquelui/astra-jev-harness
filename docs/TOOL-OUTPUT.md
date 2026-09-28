@@ -62,3 +62,5 @@ For adoption, compare identical completed coding tasks with the same model/reaso
 - [jev-pruner](https://github.com/tamaratran/jev-pruner): command wrapper, verbatim excerpts and recoverable originals informed this design. No upstream source or plugin is bundled. This version uses the existing Python transport and an explicit brief, not transcript scraping.
 - [fast-jev-compaction issue #52](https://github.com/tamaratran/fast-jev-compaction/issues/52): a reported case of scoring missing candidate content informed the full-candidate coverage invariant; the report is not our own reproduction.
 - [TypeSafe Noul](https://docs.typesafe.ai/primitives/noul), [API](https://docs.typesafe.ai/api), [Codex hooks](https://learn.chatgpt.com/docs/hooks).
+
+Saved version-1 `report.json` files can be passed to `measure.py --baseline … --candidate …` alongside related CLI records. Known Jev usage is counted; failed/unreported usage stays unknown. The selector itself makes no Astra call, but its receipt does not measure the wrapped command or Desktop conversation. See [receipt accounting](EVIDENCE.md#output-receipt-accounting-p1-a).
