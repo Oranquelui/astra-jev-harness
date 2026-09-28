@@ -16,6 +16,8 @@ A local coding harness for Codex CLI, Codex Desktop and Claude Code. Give it a t
 
 This release improves how the coding conversation reads retained context, finds files outside the first shortlist, and accounts for auxiliary Jev usage. The new `present` and `discover` commands work in Codex Desktop and Claude Code; `measure.py` also supports CLI workflow accounting.
 
+Inspired by [jevgrep](https://github.com/dzhng/jevgrep), we implemented bounded source views in [`shared/context_view.py`](shared/context_view.py) and staged discovery in [`shared/host_context.py`](shared/host_context.py). These are working Python changes with [regression tests](tests/test_context_view.py); no jevgrep source was copied or dependency added. Automatic semantic exploration and syntax-aware selection remain future work. [Adoption scope](docs/JEVGREP-ADOPTION-PLAN.md).
+
 | Area | Before | v0.6.0 |
 |---|---|---|
 | First view of retained files | Read individual ranges after selecting; full sources remain in `context.json` | `present` returns an ordered page of original source with hashes, line numbers, missing ranges and an explicit output-byte cap |
@@ -51,7 +53,7 @@ Pass related tool-output `report.json` files through repeated `--candidate` or `
 
 ### What was verified—and what remains unmeasured
 
-**198 offline tests passed**, including output-byte limits, verbatim Unicode/CRLF excerpts, long-line handling, pagination, discovery/replanning with focus preservation, stale/tampered artifacts, wrong-host rejection, Jev-required guards and usage/cache failure cases.
+**199 offline tests passed**, including output-byte limits, verbatim Unicode/CRLF excerpts, long-line handling, pagination, discovery/replanning with focus preservation, stale/tampered artifacts, wrong-host rejection, Jev-required guards and usage/cache failure cases.
 
 During implementation, **12 live Jev attempts completed (83,571 input / 813 output tokens), with zero cache reuses**. All 37 candidates were retained. A local historical replay of that selection kept all **267,517 source bytes** while the first presentation page returned **5,750 JSON bytes**, including **3,459 source bytes** across seven files. Replay made **zero additional API calls**. These are selection and presentation observations: **Astra tokens, combined cost savings, rereads, coding quality and end-to-end speed improvements remain unmeasured**. The older v0.3.0 benchmark below is not a v0.6.0 result. [Implementation evidence](docs/IMPROVEMENT-RESULTS-20260928.md).
 

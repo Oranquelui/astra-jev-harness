@@ -122,7 +122,8 @@ def normalize_record(record):
     a, ac = calls_and_count(a, ac)
     j, jc = calls_and_count(j, jc)
     return {'kind': family, 'astra': a, 'jev': j, 'acount': ac, 'jcount': jc,
-            'status': record.get('status', 'unknown'), 'seconds': record.get('seconds')}
+            'status': record.get('status', 'unknown'),
+            'seconds': record.get('seconds') if family != 'unknown' else None}
 
 
 def summarize(paths, prices=None):

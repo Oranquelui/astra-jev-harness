@@ -16,6 +16,8 @@ Codex CLI・Codex Desktop・Claude Code向けのローカルCoding Harnessです
 
 保持したcontextの読み方、最初の候補外にあるファイルの探し方、補助処理で使ったJevの使用量集計を改善しました。新しい`present`・`discover`はCodex DesktopとClaude Codeで使え、`measure.py`の改善はCLIの作業集計にも使えます。
 
+[jevgrep](https://github.com/dzhng/jevgrep)の考え方を参考に、原文の提示上限を[`shared/context_view.py`](shared/context_view.py)、段階的な探索を[`shared/host_context.py`](shared/host_context.py)へ実装しました。[回帰テスト](tests/test_context_view.py)を伴うPythonコードの変更です。jevgrepのコードの複製・依存追加はしておらず、自動の意味探索や構文単位の選別は今後の検討対象です。[採用範囲](docs/JEVGREP-ADOPTION-PLAN.md)。
+
 | 対象 | これまで | v0.6.0 |
 |---|---|---|
 | 保持ファイルの初回表示 | 選別後に個別の行範囲を読み、全文は`context.json`に保持 | `present`で読む順番、原文、hash、行番号、未提示範囲を指定した出力bytes内に表示 |
@@ -51,7 +53,7 @@ python3 "Codex Desktop/skills/astra-jev-coding/scripts/context.py" discover \
 
 ### 確認できたこと・まだ測っていないこと
 
-**オフライン198テストが成功**しました。出力bytes上限、Unicode/CRLF原文一致、長行、ページ網羅、探索後のfocus維持、古い／改変された成果物、別hostの誤受け渡し、Jev必須guard、usage・cacheの失敗系を確認しています。
+**オフライン199テストが成功**しました。出力bytes上限、Unicode/CRLF原文一致、長行、ページ網羅、探索後のfocus維持、古い／改変された成果物、別hostの誤受け渡し、Jev必須guard、usage・cacheの失敗系を確認しています。
 
 実装時のJevは**12回試行・12回完了（入力83,571／出力813 token）、cache再利用0回**でした。37候補はすべて保持されました。その保存済み選別をローカルで歴史的に再生すると、**原文267,517 bytesの保持を維持**しながら、初回提示は7ファイル・**JSON全体5,750 bytes（原文3,459 bytes）**になりました。再生時の**追加APIは0回**です。これは選別と表示量の確認で、**Astra token、総費用削減、再読込、coding品質、完了時間の改善は未測定**です。以下に残したv0.3.0の過去ベンチマークを、v0.6.0の成果として扱いません。[実装・検証記録](docs/IMPROVEMENT-RESULTS-20260928.md)。
 

@@ -97,7 +97,7 @@ P1の計測・結果を使い、既存の`shared/repo_context.py::resolve_select
 - P1-Aは既存の計測テストへ振る舞いを確認するケースを追加し、まず影響範囲を検証する。behavioral changeの最終確認はrepo方針の`python3 -m unittest -v`。同じ状態の検証を無目的に繰り返さない。
 - P2は予算・課金・永続化に触れるため、並行実行、拒否、欠測、復旧を含める。実Projectを書き換えず、synthetic fixtureと偽providerで確認する。
 - 実装した範囲に合わせて`docs/CONTEXT-BUDGETS.md`、`docs/EVIDENCE.md`、`docs/TOOL-OUTPUT.md`を更新する。利用者に見える変更は英日READMEを揃える。
-- 今回はVERSION、CHANGELOG、インストール済みSkillを変更しない。将来の版番号と公開は、実装・検証の完了後に判断する。
+- 当初の計画保存段階ではVERSION、CHANGELOG、インストール済みSkillを変更しなかった。その後の実装・検証とユーザーの公開指示を受け、v0.6.0公開準備でVERSION、CHANGELOG、英日READMEを更新している。Python同梱配布は引き続き提案段階。
 - 既存成果物の読み取り互換を維持する。新しい関連付け・予算は既存記録と分離し、導入を取り消せるようにする。ログ削除・自動migration・資格情報の移動を行わない。
 
 ## 今回の対象外と次回の開始位置

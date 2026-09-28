@@ -282,6 +282,16 @@ class UsageTests(unittest.TestCase):
             self.assertEqual(r['jev']['known_input_tokens'], 0)
             self.assertFalse(r['jev']['complete_usage'])
 
+    def test_unknown_schema_never_contributes_run_seconds(self):
+        cli = {'astra_calls': [], 'attempted_astra_calls': 0,
+               'attempted_jev_calls': 0, 'seconds': 2}
+        for extra in [{}, {'kind': 'other'}, {'kind': 'tool-output', 'version': 2}]:
+            with self.subTest(schema=extra):
+                unknown = dict(seconds=99, **extra)
+                self.assertIsNone(self.summarize_records([unknown])['summed_run_seconds'])
+                self.assertIsNone(self.summarize_records([cli, unknown])['summed_run_seconds'])
+        self.assertEqual(self.summarize_records([cli])['summed_run_seconds'], 2)
+
     def test_no_call_output_and_host_usage_are_distinct(self):
         aux = {'kind': 'tool-output', 'version': 1, 'calls': [], 'attempted_calls': 0}
         r = self.summarize_records([aux])
