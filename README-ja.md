@@ -1,6 +1,6 @@
 # Astra + Jev：Codex・Claude Code向けエージェントスキル
 
-[English](README.md) · [バージョン 0.5.1](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
+[English](README.md) · [バージョン 0.6.0](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
 
 このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](Codex%20Desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。別途、**Claude Code用の[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md)**を追加し、同じコンテキスト選別を現在のClaude Codeセッションで使えるようにしました。
 
@@ -11,6 +11,51 @@ Codex CLI・Codex Desktop・Claude Code向けのローカルCoding Harnessです
 **目的：** コードの正しさを保ちながら、Astraの消費tokenと推論全体の費用を減らし、完成までの時間・手戻りも抑えることです。ファイル選別はそのための手段です。Claude Code版も同じ目的をClaudeに広げますが、その削減効果は未測定です。
 
 **実験段階です。** 過去の**v0.3.0**で、**Astra Extra High（`xhigh`）**で合成CLI課題を修正・テストまで比較すると、**Astra入力27.0%減、Jev込みのStandard API単価換算27.2%減**でした。両方式とも同じ6件の確認に成功。所要時間はこの比較では7.3%減でしたが、別の`medium`比較では34.6%増でした。各方式1試行であり、一般的な高速化やDesktopでの効果は示しません。[測定条件と結果](docs/BENCHMARKS.md)。
+
+## v0.6.0：原文の提示上限・段階的なファイル発見・使用量集計の改善
+
+保持したcontextの読み方、最初の候補外にあるファイルの探し方、補助処理で使ったJevの使用量集計を改善しました。新しい`present`・`discover`はCodex DesktopとClaude Codeで使え、`measure.py`の改善はCLIの作業集計にも使えます。
+
+| 対象 | これまで | v0.6.0 |
+|---|---|---|
+| 保持ファイルの初回表示 | 選別後に個別の行範囲を読み、全文は`context.json`に保持 | `present`で読む順番、原文、hash、行番号、未提示範囲を指定した出力bytes内に表示 |
+| 最初の候補外のファイル | 候補外のパスは記録するが、その後は手動で調査 | `discover`でディレクトリ一覧→短い原文preview→focus付き再計画へ進める |
+| 進捗ログ選別の使用量 | `report.json`の`calls`を共通の計測処理が集計できなかった | 認識済みtool-output v1記録の既知usageをCLI・evidenceと統合し、欠測は不明のまま表示 |
+
+### 必要候補を保持したまま、一度に読む量を制限
+
+Jevの`select`と`check`が成功した後、最初のページを取得します。
+
+```sh
+python3 "Codex Desktop/skills/astra-jev-coding/scripts/context.py" present \
+  --selection /absolute/selection --max-bytes 8192 --lines-per-file 12
+```
+
+上限はmetadata・末尾改行を含む**JSON応答全体**に適用します（1,024～24,000 bytes、既定8,192）。repo指示→focus→保存済み関連度の順に提示し、本文は確認済みsnapshotから複写します。Jevに原文や要約を生成させません。保持済み全文は残り、`unpresented_ranges`で未提示行、`next_offset`で次のファイルページを確認し、必要箇所は`read`で取得できます。収まらない長行は未提示を明示した読込先として返します。`present`は実APIまたはcacheによる有効なJev判定、鮮度、hostの一致を必須とし、追加APIを呼びません。
+
+### 最初の候補外も段階的に探す
+
+```sh
+python3 "Codex Desktop/skills/astra-jev-coding/scripts/context.py" discover \
+  --plan /absolute/plan
+# 一覧に表示されたディレクトリを正確に指定:
+python3 "Codex Desktop/skills/astra-jev-coding/scripts/context.py" discover \
+  --plan /absolute/plan --directory src/another-component
+```
+
+ディレクトリとpreviewはページを辿って確認でき、複数の有力な枝を残します。ここで見えるファイルは**未判定**であり、「無関係」や「編集許可済み」ではありません。既存の`--focus-file`・`--include-file`を維持し、発見したfocusを加えた**新しいplan**を作り、送信候補と予算を確認して通常の`select → check`へ戻ります。自動追加APIや再試行は行わず、秘密情報・未対応ファイルの除外も維持します。操作型の探索であり、自動の意味検索や必要ファイルの発見保証ではありません。Claude Codeでは`Claude Code/context.py`と、そのhost専用のplan・selectionを使います。[使い方と制限](docs/CONTEXT-VIEWS.md)。
+
+### コーディング周辺で使ったJevも集計
+
+`measure.py`の`--candidate`または`--baseline`を繰り返し、関連するcoding/evidence記録とtool-outputの`report.json`を渡せます。記録形式を識別して、既知usage・記録済み時間・不明分を分けます。同一artifactパスは1回、同じrequest hashでも別の実呼び出しは別消費として数え、cacheの過去usageを新規消費へ加算しません。補助記録だけからラップしたcommandやDesktop会話全体の費用は確定しません。モデル別単価は任意の見積であり、実請求額とは区別します。[集計の詳細](docs/EVIDENCE.md#output-receipt-accounting-p1-a)。
+
+### 確認できたこと・まだ測っていないこと
+
+**オフライン198テストが成功**しました。出力bytes上限、Unicode/CRLF原文一致、長行、ページ網羅、探索後のfocus維持、古い／改変された成果物、別hostの誤受け渡し、Jev必須guard、usage・cacheの失敗系を確認しています。
+
+実装時のJevは**12回試行・12回完了（入力83,571／出力813 token）、cache再利用0回**でした。37候補はすべて保持されました。その保存済み選別をローカルで歴史的に再生すると、**原文267,517 bytesの保持を維持**しながら、初回提示は7ファイル・**JSON全体5,750 bytes（原文3,459 bytes）**になりました。再生時の**追加APIは0回**です。これは選別と表示量の確認で、**Astra token、総費用削減、再読込、coding品質、完了時間の改善は未測定**です。以下に残したv0.3.0の過去ベンチマークを、v0.6.0の成果として扱いません。[実装・検証記録](docs/IMPROVEMENT-RESULTS-20260928.md)。
+
+既存cloneの変更を保持してv0.6.0へ更新し、`python3 install.py --check`（Claude Codeは`--target claude-code`を追加）でSkillの参照先を確認してください。既存のPython入口・保存記録・選別policy・方式分離は継続します。**Python 3.10以上は引き続き必要**で、[Python同梱配布案](docs/PYTHON-DISTRIBUTION-PROPOSAL.md)は今回未実装です。課題全体の共有予算、自動retry、構文単位の選別、batch/cacheの既定変更も含みません。
 
 ## v0.5.1：Desktop SkillでJev判定を必須化
 
@@ -275,7 +320,3 @@ plan・candidate・runにはソースが入ります。対象repo外に保存し
 ## ライセンス
 
 [MIT](LICENSE)。OpenAIやTypeSafeの公式製品ではありません。利用するプロバイダーのアクセス権と支払いは利用者自身が管理します。
-
-### 原文の提示上限・段階的発見・使用量統合
-
-DesktopとClaude Codeに[原文を返す`present`と段階的に探索する`discover`](docs/CONTEXT-VIEWS.md)を追加しました。保持済み全文を変えず、未提示・未判定を明示し、追加APIは呼びません。`measure.py`は認識済みtool-output記録も集計し、会話全体の欠測は不明のまま扱います。token・費用の削減効果は未測定です。[Python配布案](docs/PYTHON-DISTRIBUTION-PROPOSAL.md)は利用者によるPythonの別途準備を不要にする提案で、現行のインストールには引き続きPythonが必要です。
