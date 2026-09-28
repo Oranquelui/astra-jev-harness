@@ -211,3 +211,15 @@ func TestNativeCommandParserAndNoPythonExecutable(t *testing.T) {
 		t.Fatal(stderr.String())
 	}
 }
+
+func TestNativeDiffPreservesSourceText(t *testing.T) {
+	original := "value = 'a/a/original b/b/original'\n"
+	replacement := "value = 'a/a/replacement b/b/replacement'\n"
+	p := M{"files": M{"src/value.py": M{"content": original}}}
+	patch := changesDiff(p, M{"src/value.py": replacement, "empty.py": ""})
+	for _, want := range []string{"--- a/src/value.py", "+++ b/src/value.py", "-" + original, "+" + replacement, "new file mode 100644"} {
+		if !strings.Contains(patch, want) {
+			t.Fatalf("patch lost original source or path: %q\n%s", want, patch)
+		}
+	}
+}

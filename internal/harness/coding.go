@@ -109,9 +109,9 @@ func changesDiff(plan M, edits M) string {
 		}
 		writeBytes(safePath(b, p), []byte(str(v)), 0600)
 	}
-	proc := process([]string{"git", "-c", "core.quotePath=false", "diff", "--no-index", "--no-ext-diff", "--no-textconv", "--", "a", "b"}, root, childEnv("TYPESAFE_API_KEY"), 15*time.Second, "")
+	proc := process([]string{"git", "-c", "core.quotePath=false", "diff", "--no-index", "--no-ext-diff", "--no-textconv", "--src-prefix=", "--dst-prefix=", "--", "a", "b"}, root, childEnv("TYPESAFE_API_KEY"), 15*time.Second, "")
 	need(integer(proc["returncode"]) <= 1, "Cannot produce candidate diff")
-	return strings.ReplaceAll(strings.ReplaceAll(str(proc["stdout"]), "a/a/", "a/"), "b/b/", "b/")
+	return str(proc["stdout"])
 }
 func (r *Runtime) codingRun(planDir, out, mode, cache, evidence string, command []string, timeout int) M {
 	planDir, out = absolute(planDir), absolute(out)

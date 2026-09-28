@@ -68,7 +68,7 @@ This runtime migration uses bounded Jev development-context selection separately
 
 ## Local verification at runtime cutover (2026-09-29)
 
-- 30 native Go tests passed, including race-enabled execution and `go vet`; migration-only tests used synthetic Python fixtures and fake Codex, not a real generation.
+- 31 native Go tests passed, including race-enabled execution and `go vet`; migration-only tests used synthetic Python fixtures and fake Codex, not a real generation.
 - 199 retained Python tests passed; all 1,181 final core compatibility cases matched, with timing disabled.
 - Native-to-Python and Python-to-native plan/selection checks passed. The installed-style `.sh` Skill resolved the correct checkout and rejected no-Jev and stale handoffs.
 - The native workflow ran with a PATH containing only Git/dirname and failing traps named python, python3 and go. No interpreter/compiler trap ran, no live provider was called, and no timing sample was taken.
