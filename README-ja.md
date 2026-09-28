@@ -14,6 +14,8 @@ Codex CLI・Codex Desktop・Claude Code向けのローカルCoding Harnessです
 
 ## v0.6.0：原文の提示上限・段階的なファイル発見・使用量集計の改善
 
+**未公開のGo移植の作業状況:** Pythonのimport抽出、互換JSON／hash、原文提示の基礎処理をGoのオフライン実行ファイルへ移しました。開発用の互換性確認段階で、正式なHarnessとinstallerには引き続きPythonが必要です。このGoコアはAPIを呼ばず、通常のCodingへ計測処理も追加しません。速度測定は明示指定時だけで、既定はOFFです。[範囲・ビルド・確認方法](docs/GO-MIGRATION.md)。
+
 保持したcontextの読み方、最初の候補外にあるファイルの探し方、補助処理で使ったJevの使用量集計を改善しました。新しい`present`・`discover`はCodex DesktopとClaude Codeで使え、`measure.py`の改善はCLIの作業集計にも使えます。
 
 [jevgrep](https://github.com/dzhng/jevgrep)の考え方を参考に、原文の提示上限を[`shared/context_view.py`](shared/context_view.py)、段階的な探索を[`shared/host_context.py`](shared/host_context.py)へ実装しました。[回帰テスト](tests/test_context_view.py)を伴うPythonコードの変更です。jevgrepのコードの複製・依存追加はしておらず、自動の意味探索や構文単位の選別は今後の検討対象です。[採用範囲](docs/JEVGREP-ADOPTION-PLAN.md)。

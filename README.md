@@ -14,6 +14,8 @@ A local coding harness for Codex CLI, Codex Desktop and Claude Code. Give it a t
 
 ## v0.6.0: bounded source views, staged discovery and auxiliary usage accounting
 
+**Unreleased Go migration work:** an offline native core now covers Python import extraction, compatible JSON/hash encoding and bounded source-view primitives. This is a development compatibility slice; the supported Harness and installer still require Python. It makes no provider calls and adds no measurement overhead to coding sessions. Timing is opt-in and off by default. [Scope, build and checks](docs/GO-MIGRATION.md).
+
 This release improves how the coding conversation reads retained context, finds files outside the first shortlist, and accounts for auxiliary Jev usage. The new `present` and `discover` commands work in Codex Desktop and Claude Code; `measure.py` also supports CLI workflow accounting.
 
 Inspired by [jevgrep](https://github.com/dzhng/jevgrep), we implemented bounded source views in [`shared/context_view.py`](shared/context_view.py) and staged discovery in [`shared/host_context.py`](shared/host_context.py). These are working Python changes with [regression tests](tests/test_context_view.py); no jevgrep source was copied or dependency added. Automatic semantic exploration and syntax-aware selection remain future work. [Adoption scope](docs/JEVGREP-ADOPTION-PLAN.md).
