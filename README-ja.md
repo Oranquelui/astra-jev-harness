@@ -1,6 +1,6 @@
 # Astra + Jev：Codex・Claude Code向けエージェントスキル
 
-[English](README.md) · [バージョン 0.6.0](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
+[English](README.md) · [バージョン 0.7.1](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
 
 このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](Codex%20Desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。別途、**Claude Code用の[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md)**を追加し、同じコンテキスト選別を現在のClaude Codeセッションで使えるようにしました。
 
@@ -11,6 +11,12 @@ Codex CLI・Codex Desktop・Claude Code向けのローカルCoding Harnessです
 **目的：** コードの正しさを保ちながら、Astraの消費tokenと推論全体の費用を減らし、完成までの時間・手戻りも抑えることです。ファイル選別はそのための手段です。Claude Code版も同じ目的をClaudeに広げますが、その削減効果は未測定です。
 
 **実験段階です。** 過去の**v0.3.0**で、**Astra Extra High（`xhigh`）**で合成CLI課題を修正・テストまで比較すると、**Astra入力27.0%減、Jev込みのStandard API単価換算27.2%減**でした。両方式とも同じ6件の確認に成功。所要時間はこの比較では7.3%減でしたが、別の`medium`比較では34.6%増でした。各方式1試行であり、一般的な高速化やDesktopでの効果は示しません。[測定条件と結果](docs/BENCHMARKS.md)。
+
+## v0.7.1：Jev使用量の定型報告を削除
+
+Desktop Skillが進捗・完了のたびにJevの呼び出し回数、token使用量、cache再利用件数、費用、出力bytesを報告する指示を削除しました。通常の返信は変更内容・検証結果・対応が必要な問題に絞ります。任意の進捗ログ選別と評価資料の再利用にあった個別の報告指示も整理しました。
+
+呼び出し上限、cache検証、失敗時の復旧に必要な内部記録と、明示実行する`measure`コマンドは維持します。内訳はユーザーが明示的に依頼した場合だけ保存済み記録から回答し、報告のための追加API・ベンチマーク・比較は実行しません。今回はSkillの指示と配布versionの修正で、実行コードやプロバイダーの動作は変更していません。新たな速度・費用削減率も主張しません。
 
 ## v0.7.0：Pythonが不要なGo実行版
 
@@ -172,7 +178,7 @@ $astra-jev-coding この課題をAstra＋Jevで実装してください。対象
 
 Skillが課題・repo指示・送信対象を確認し、選別と鮮度確認を行った後、この会話で実装を続けます。Desktopプロセスからシェルの環境変数が見えない場合は、キー設定済みterminalでhelperを実行するか、任意のKeychain読み込みを使用してください。別terminalの`export`だけでは起動済みDesktopアプリの環境は変わりません。
 
-Desktop Skillの呼び出しはJev選別を使う依頼として扱います。入口が`select`・`check`・`read`へ`--require-jev`を付けるため、通常は`--mode jev`で実行します。`local`と小さい入力の`auto`はキー取得・API呼び出し・出力作成の前に拒否し、Jev判定のない受け渡しも拒否します。有効な同一リクエストのキャッシュは利用でき、再利用件数と新しいAPI呼び出し件数を分けて報告します。キー不足やAPI失敗を理由にlocalへ黙って切り替えたり、記録を確認せず再実行したりしません。この確認はSkillの入口に適用され、会話中の全ツールを自動制御するものではありません。
+Desktop Skillの呼び出しはJev選別を使う依頼として扱います。入口が`select`・`check`・`read`へ`--require-jev`を付けるため、通常は`--mode jev`で実行します。`local`と小さい入力の`auto`はキー取得・API呼び出し・出力作成の前に拒否し、Jev判定のない受け渡しも拒否します。有効な同一リクエストのキャッシュは利用できます。通常の返信は変更内容と検証結果に絞り、Jevの回数・使用量の内訳は明示的に依頼された場合だけ保存済み記録から回答します。キー不足やAPI失敗を理由にlocalへ黙って切り替えたり、記録を確認せず再実行したりしません。この確認はSkillの入口に適用され、会話中の全ツールを自動制御するものではありません。
 
 開発ファイルの選別と、製品の実行時に有料モデルを呼ぶ処理は別の範囲です。ただし、すべての外部送信・有料呼び出しを禁じる指示は守ります。利用者がJevなしの比較・オフライン作業を明示的に求めた場合は、下記のhelperを直接使い、その方式を明記します。任意の`output.py`の動作は変わりません。[Desktopの詳細](Codex%20Desktop/README.md) · [v0.5.1の変更](CHANGELOG.md)。
 

@@ -1,6 +1,6 @@
 # Astra + Jev: Codex and Claude Code Agent Skills
 
-[日本語](README-ja.md) · [Version 0.7.0](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
+[日本語](README-ja.md) · [Version 0.7.1](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
 
 This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20Desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately. A separate **[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md) for Claude Code** applies the same context selection to the current Claude Code session.
 
@@ -11,6 +11,12 @@ A local coding harness for Codex CLI, Codex Desktop and Claude Code. Give it a t
 **Goal:** reduce Astra token consumption and combined inference cost while preserving coding correctness and avoiding extra turnaround time. File selection is a means to that goal. The Claude Code Skill extends the same goal to Claude; its savings are not yet measured.
 
 **Experimental.** In a historical **v0.3.0** comparison, one synthetic CLI coding task at **Astra Extra High (`xhigh`)** used **27.0% fewer Astra input tokens** and **27.2% less at equivalent Standard API rates**, including Jev. Both modes passed the same six checks. Elapsed time was 7.3% shorter in this pair, but 34.6% longer in a separate `medium` pair. Each is one trial per mode, not a general speedup or Desktop result. [Measurements and limits](docs/BENCHMARKS.md).
+
+## v0.7.1: remove routine Jev usage reporting
+
+The Desktop Skill no longer requires every progress or final reply to include Jev request counts, tokens, cache-reuse totals, cost summaries, or output-byte statistics. Replies focus on the implemented change, validation, and actionable blockers. This also removes the separate accounting instructions from optional progress-log selection and evidence reuse.
+
+Internal receipts, request caps, cache validation, failure recovery, and the explicitly invoked `measure` command remain available. Accounting is shown from saved records only when the user explicitly requests it; reporting never triggers extra API calls, benchmarks, or comparisons. This patch changes Skill guidance and release metadata, not the runtime selection or provider behavior. No new performance or cost-saving claim is made.
 
 ## v0.7.0: a Go runtime without Python
 
@@ -82,7 +88,7 @@ During implementation, **12 live Jev attempts completed (83,571 input / 813 outp
 
 ## v0.5.1: require Jev judgments in the Desktop Skill
 
-Fix a workflow where invoking `astra-jev-coding` could still finish context selection with `--mode local` and no Jev judgment. The Skill entrypoint now requires validated Jev judgments for `select`, `check`, and `read`. Local or small-context auto skips fail before credentials or transmission; previously saved local handoffs are also rejected. Matching cached judgments remain valid and are reported separately from new API calls. Direct native helpers retain explicit baseline modes; Claude Code defaults and optional progress-log selection are unchanged.
+Fix a workflow where invoking `astra-jev-coding` could still finish context selection with `--mode local` and no Jev judgment. The Skill entrypoint now requires validated Jev judgments for `select`, `check`, and `read`. Local or small-context auto skips fail before credentials or transmission; previously saved local handoffs are also rejected. Matching cached judgments remain valid and are recorded separately from new API calls. Direct native helpers retain explicit baseline modes; Claude Code defaults and optional progress-log selection are unchanged.
 
 Validation: **183 offline tests passed**. An installed-Skill check on a synthetic three-file repository completed plan/select/check/read with **one Jev call (960 input / 55 output tokens)**; reusing the same judgments required **zero additional API calls**. This release fixes execution correctness and makes **no new token or cost-saving claim**. [Upgrade details](Codex%20Desktop/README.md) · [Changelog](CHANGELOG.md).
 
@@ -172,7 +178,7 @@ $astra-jev-coding Fix this task with Astra + Jev in the current checkout.
 
 The Skill uses your task and repository instructions, reviews the files to send, selects context, checks freshness, and continues implementation in that conversation. If the Desktop process cannot see your shell environment, use the helper from a terminal with the key configured or the optional Keychain lookup; `export` in a separate terminal does not change an already-running app's environment.
 
-Invoking the Desktop Skill requests Jev selection. Its launcher enforces `--require-jev` on `select`, `check`, and `read`; use `--mode jev`. It rejects `local` and small-context `auto` before credentials, API calls, or output creation, and refuses handoffs without valid Jev judgments. Matching cached judgments remain usable; report reused judgments separately from new API calls. A missing key or provider failure must not silently switch the workflow to local selection or trigger a blind retry. These checks apply to this Skill's entrypoint, not every tool in the conversation.
+Invoking the Desktop Skill requests Jev selection. Its launcher enforces `--require-jev` on `select`, `check`, and `read`; use `--mode jev`. It rejects `local` and small-context `auto` before credentials, API calls, or output creation, and refuses handoffs without valid Jev judgments. Matching cached judgments remain usable. Routine replies focus on changes and verification; Jev usage or call-count summaries are provided from saved receipts only when explicitly requested. A missing key or provider failure must not silently switch the workflow to local selection or trigger a blind retry. These checks apply to this Skill's entrypoint, not every tool in the conversation.
 
 Development selection and the product runtime's paid-model calls have separate scopes; an explicit ban on all external or paid calls still applies. For a user-requested no-Jev baseline/offline run, use the direct native helper described below and label it as such. The optional `output.py` behavior is unchanged. [Desktop details](Codex%20Desktop/README.md) · [v0.5.1 changes](CHANGELOG.md).
 

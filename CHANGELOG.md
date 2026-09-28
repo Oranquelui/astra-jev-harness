@@ -1,5 +1,12 @@
 # Changelog / 変更履歴
 
+## v0.7.1 — 2026-09-29
+
+- Remove mandatory routine Jev accounting from the Codex Desktop Skill: planned/actual call counts, tokens, cache reuse, cost summaries, and output bytes. Progress and final replies focus on changes, verification, and actionable blockers.
+- Keep internal receipts, request caps, validated cache reuse, failure recovery, and explicit measurement tools. Show accounting from saved records only on an explicit user request; never add API calls, benchmarks, or comparisons for reporting. Runtime and Claude Code Skill behavior are unchanged.
+- Align Desktop guidance and both READMEs, correct the Japanese README version link, and publish matching v0.7.1 native packages.
+- Codex Desktop SkillのJev回数・使用量・cache・費用・出力bytesの定型報告を削除。通常の返信を変更内容と検証結果に絞り、内訳は明示的な依頼時だけ保存済み記録から回答します。内部の上限制御・失敗復旧・cache・任意の計測機能は維持し、報告のための追加APIや比較は実行しません。英日READMEと配布versionを揃え、実行コードとClaude Code Skillの動作は変更しません。
+
 ## v0.7.0 — 2026-09-29
 
 - Replace normal Harness execution and Skill installation with a compiled Go runtime: Desktop/Claude context workflows, evidence, optional output selection, saved-receipt comparison and CLI candidate generation/verify/apply. Python remains a source-only development oracle; platform archives do not contain Python entrypoints.
