@@ -9,7 +9,10 @@ You (the current Claude Code session) implement, review and test the change with
 
 ## Entrypoint and credentials
 
-Run `python3 "<base directory of this Skill>/scripts/context.py" <command> ...` using the absolute base directory shown when the Skill loads. Quote it; it may contain spaces. The wrapper resolves its symlink to `Claude Code/context.py` in the linked Harness checkout. `doctor` reports the checkout and whether a key is available, without calling a provider or printing the key.
+The supported runtime is the prebuilt Go executable in `bin/astra-jev`. Python and Go are not needed during coding. Build once with `scripts/build-native.sh` (Go 1.26+ and a C compiler), or use the matching platform release archive. Do not rebuild, benchmark or run model comparisons during normal coding. The historical `.py` files remain development references.
+
+
+Run `"<base directory of this Skill>/scripts/context.sh" <command> ...` using the absolute base directory shown when the Skill loads. Quote it; it may contain spaces. The wrapper resolves its symlink to `bin/astra-jev claude-code` in the linked Harness checkout. `doctor` reports the checkout and whether a key is available, without calling a provider or printing the key.
 
 An existing `TYPESAFE_API_KEY` takes precedence. On macOS the helper can read login Keychain service `astra-jev-harness`, account `TYPESAFE_API_KEY`, into its own process only. Never print keys, pass them as arguments, search `.env` files, or forward them. A missing key blocks `select` with Jev, not local planning. A Keychain timeout does not prove the key is absent.
 

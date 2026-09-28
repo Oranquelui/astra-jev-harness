@@ -1,6 +1,6 @@
 # Astra + Jev: Codex and Claude Code Agent Skills
 
-[日本語](README-ja.md) · [Version 0.6.0](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
+[日本語](README-ja.md) · [Version 0.7.0](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
 
 This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20Desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately. A separate **[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md) for Claude Code** applies the same context selection to the current Claude Code session.
 
@@ -12,9 +12,28 @@ A local coding harness for Codex CLI, Codex Desktop and Claude Code. Give it a t
 
 **Experimental.** In a historical **v0.3.0** comparison, one synthetic CLI coding task at **Astra Extra High (`xhigh`)** used **27.0% fewer Astra input tokens** and **27.2% less at equivalent Standard API rates**, including Jev. Both modes passed the same six checks. Elapsed time was 7.3% shorter in this pair, but 34.6% longer in a separate `medium` pair. Each is one trial per mode, not a general speedup or Desktop result. [Measurements and limits](docs/BENCHMARKS.md).
 
+## v0.7.0: a Go runtime without Python
+
+The regular Harness, both Skill launchers and installer now use the compiled **`bin/astra-jev`** executable. Python is no longer a Harness runtime dependency. Go and a C compiler are needed only when building from source; platform archives contain the executable and Skill resources. Your project's own test command may still require its language runtime.
+
+| Area | v0.6.0 | v0.7.0 |
+|---|---|---|
+| Startup and installation | Python interpreter and Python scripts | One native executable, built once or extracted from a platform archive |
+| Desktop / Claude Code | Python plan/select/check/read helpers | Go plan/select/check/read/present/discover/compare with the same host boundaries |
+| CLI | Python candidate generation and apply | Go candidate generation, verification recovery and explicit apply with rollback |
+| Context integrity | Python snapshots, source/receipt hashes and dependency closure | Native path/symlink/secret guards, freshness, JSON hashes, request caps and cache validation |
+| Source languages | Python and JS/TS dependency discovery | Tree-sitter Python extraction, existing JS/TS resolution, plus Go package/module dependencies |
+| Auxiliary operations | Python evidence, progress output, usage receipts | Native evidence/output/measure commands; output executes the wrapped command once |
+| Normal coding overhead | Optional comparison commands | No benchmark, repeated timing, model A/B, automatic compilation or extra provider requests added |
+
+Correctness comes from preserving request contents, cache keys, uncertain-context retention and failure handling, then checking them locally against the existing implementation. Parser uncertainty retains Python context. Protected tests/instructions, explicit creation grants, verified-candidate hashes and rollback remain enforced. An unrecognized cost/usage field stays unknown. `measure` only reads receipts when explicitly requested; it is not a background measurement service.
+
+The expected operational benefit is removal of interpreter setup and repeated Python startup. **This release does not claim a measured reduction in coding tokens, total provider cost or end-to-end coding time.** The migration checks use synthetic repositories and local fake providers; they do not run live model comparisons. Historical benchmark results below retain their original version labels.
+
+The `.py` implementation and synthetic Python benchmarks remain in the source repository as development/compatibility references. They are excluded from native platform archives, and neither native commands nor the installed `.sh` Skill launchers execute them. The small `astra-jev-core` remains a separate offline development tool. [Migration, compatibility and build details](docs/GO-MIGRATION.md).
+
 ## v0.6.0: bounded source views, staged discovery and auxiliary usage accounting
 
-**Unreleased Go migration work:** an offline native core now covers Python import extraction, compatible JSON/hash encoding and bounded source-view primitives. This is a development compatibility slice; the supported Harness and installer still require Python. It makes no provider calls and adds no measurement overhead to coding sessions. Timing is opt-in and off by default. [Scope, build and checks](docs/GO-MIGRATION.md).
 
 This release improves how the coding conversation reads retained context, finds files outside the first shortlist, and accounts for auxiliary Jev usage. The new `present` and `discover` commands work in Codex Desktop and Claude Code; `measure.py` also supports CLI workflow accounting.
 
@@ -59,7 +78,7 @@ Pass related tool-output `report.json` files through repeated `--candidate` or `
 
 During implementation, **12 live Jev attempts completed (83,571 input / 813 output tokens), with zero cache reuses**. All 37 candidates were retained. A local historical replay of that selection kept all **267,517 source bytes** while the first presentation page returned **5,750 JSON bytes**, including **3,459 source bytes** across seven files. Replay made **zero additional API calls**. These are selection and presentation observations: **Astra tokens, combined cost savings, rereads, coding quality and end-to-end speed improvements remain unmeasured**. The older v0.3.0 benchmark below is not a v0.6.0 result. [Implementation evidence](docs/IMPROVEMENT-RESULTS-20260928.md).
 
-Update your existing clone to v0.6.0 while preserving local changes, then use `python3 install.py --check` (or `--target claude-code`) to inspect its Skill link. Existing source entrypoints, saved receipt formats, selection policy and workflow separation remain supported. **Python 3.10+ is still required**; the [bundled-Python distribution proposal](docs/PYTHON-DISTRIBUTION-PROPOSAL.md) is not implemented in this release. Shared task budgets, automatic retries, syntax-aware selection and new batch/cache defaults are also not included.
+**Historical v0.6.0 instructions (use the v0.7.0 steps below for the current runtime):** update your clone to that tag while preserving local changes, then use `python3 install.py --check` (or `--target claude-code`) to inspect its Skill link. Existing source entrypoints, saved receipt formats, selection policy and workflow separation remain supported. **Python 3.10+ was required for v0.6.0**; the [bundled-Python distribution proposal](docs/PYTHON-DISTRIBUTION-PROPOSAL.md) is not implemented in this release. Shared task budgets, automatic retries, syntax-aware selection and new batch/cache defaults are also not included.
 
 ## v0.5.1: require Jev judgments in the Desktop Skill
 
@@ -108,18 +127,19 @@ Select original evaluation excerpts with source hashes and line numbers, retain 
 | What does Jev do? | Selects context before generation | Selects files for the current conversation to read | Selects files for the current session to read |
 | Workflow | `plan → run → verify → apply` | `plan → select → check → implement/validate as appropriate in the conversation` | Same as Desktop |
 | Target writes | Explicit `apply` after verification | Your normal Desktop editing tools | Claude Code's normal tools and permission prompts |
-| Entrypoint | `python3 "Codex cli/main.py"` | `python3 "Codex Desktop/context.py"` or the Skill | `python3 "Claude Code/context.py"` or `/claude-jev-coding` |
+| Entrypoint | `bin/astra-jev cli` | `bin/astra-jev desktop` or the Skill | `bin/astra-jev claude-code` or `/claude-jev-coding` |
 
 Desktop and Claude Code do **not** spawn another coding agent to generate code. No workflow registers Jev as a model in a host's model menu.
 
 ## Start here
 
-Requires Python **3.10+**, Git, and the host you use: Codex for the Codex workflows, or Claude Code for the Claude Skill. Live Jev selection requires your own TypeSafe API key; local selection does not. No third-party Python runtime dependencies. Codex measurements were made locally on macOS with Python 3.14 and Codex CLI 0.153.2; other platforms and Codex versions are not established by that measurement. CLI generation requires access to the configured model in your own Codex account and a working `codex sandbox` command. The included runtime flags are version-sensitive.
+Requires Git, the native executable for your OS/CPU, and your chosen host (Codex or Claude Code). No Python or Go installation is needed with a platform archive. Source builds require Go 1.26+ and a C compiler for the linked Tree-sitter parser. Published archives target macOS arm64 and Linux amd64; other OS/CPU combinations need their own build and verification. CLI generation uses your own configured Codex account and requires a working `codex sandbox`; its flags remain version-sensitive. Live Jev selection requires your own TypeSafe key.
 
 ```sh
 git clone https://github.com/Oranquelui/astra-jev-harness.git
 cd astra-jev-harness
-python3 -m unittest -v
+scripts/build-native.sh
+bin/astra-jev --help
 ```
 
 Use **your own credentials**:
@@ -130,7 +150,7 @@ export TYPESAFE_API_KEY="YOUR_OWN_TYPESAFE_API_KEY"
 
 # CLI generation only: log in to your own account if needed.
 codex login
-python3 "Codex cli/main.py" doctor
+bin/astra-jev cli doctor
 ```
 
 No maintainer API key, Codex login, session cookie, or authentication file is included. Never commit a real key. `doctor` reports availability, not the value; it does not call an API. Existing environment values take precedence. On macOS, an already-configured login Keychain item with service `astra-jev-harness` and account `TYPESAFE_API_KEY` can be used instead. The installer does not create that item or share anyone else's account.
@@ -138,8 +158,8 @@ No maintainer API key, Codex login, session cookie, or authentication file is in
 ### Codex Desktop
 
 ```sh
-python3 install.py --check
-python3 install.py
+bin/astra-jev install --check
+bin/astra-jev install
 ```
 
 This links only the Desktop Skill into `$CODEX_HOME/skills` (default `~/.codex/skills`). It refuses to overwrite a different existing Skill, changes no Codex model settings, and does not read or copy your login. Keep this clone in place. To uninstall, remove only the `astra-jev-coding` symlink created by the installer. If it is not visible yet, start a new Codex task.
@@ -159,38 +179,30 @@ Development selection and the product runtime's paid-model calls have separate s
 ### Claude Code
 
 ```sh
-python3 install.py --target claude-code --check
-python3 install.py --target claude-code
-python3 ~/.claude/skills/claude-jev-coding/scripts/context.py doctor
+bin/astra-jev install --target claude-code --check
+bin/astra-jev install --target claude-code
+~/.claude/skills/claude-jev-coding/scripts/context.sh doctor
 ```
 
 This links only `claude-jev-coding` into `~/.claude/skills`. For project scope, add `--skills-dir "/absolute/project/.claude/skills"`. The installer applies the same no-overwrite and no-credential rules as the Desktop install and is idempotent. `doctor` reports `"surface": "claude-code"` and key availability without printing the key. Use your own TypeSafe key, from the environment or the same optional Keychain item. In the target repository, ask Claude Code for a Jev-selected change, or invoke the Skill explicitly with `/claude-jev-coding <task>`. The Skill does not pre-approve tools, change the model or effort, or fork context. [Claude Code details](Claude%20Code/README.md).
 
 Locally verified on 2026-09-24 with Claude Code 2.1.281: Skill discovery and invocation, then plan/select/check/bounded read, native editing and three passing fixture tests. This acceptance check used `--mode local` (zero Jev calls); it is not a live-Jev or token-savings benchmark. The full offline harness suite passed 141 tests at that stage.
 
-### CLI: an isolated example
+### CLI: your own repository
 
-Run these from the clone root. Plan and run directories must be outside the target repository and must not already exist.
+Plan and run directories must be new and outside the target repository. Write the exact task in `/absolute/task.txt`, review `PLAN.md`, and supply your project's own test command.
 
 ```sh
-DEMO_ROOT=$(mktemp -d)
-python3 make_demo.py "$DEMO_ROOT/repo"
-printf '%s\n' 'Fix page_items: page numbers start at 1. Clamp page and explicit size to at least 1; use DEFAULT_PAGE_SIZE only when size is None. Preserve the API and tests.' > "$DEMO_ROOT/task.txt"
-
-# Local inspection only. Review PLAN.md before sending source to a provider.
-python3 "Codex cli/main.py" plan --repo "$DEMO_ROOT/repo" \
-  --task-file "$DEMO_ROOT/task.txt" --out "$DEMO_ROOT/plan"
-
-# Paid/provider usage: at most 24 Jev requests and 2 Astra generations.
-python3 "Codex cli/main.py" run --plan "$DEMO_ROOT/plan" \
-  --out "$DEMO_ROOT/run" --mode jev \
-  --verify-json '["python3", "-B", "-m", "unittest", "discover"]'
-
-# Review REPORT.md, changes.diff, and verification output first.
-python3 "Codex cli/main.py" apply --run "$DEMO_ROOT/run"
+bin/astra-jev cli plan --repo /absolute/target/repo \
+  --task-file /absolute/task.txt --out /absolute/plan
+# Provider calls occur only in this explicitly requested run.
+bin/astra-jev cli run --plan /absolute/plan --out /absolute/run --mode jev \
+  --verify-json '["go", "test", "./..."]'
+# Review the saved diff and verification before applying.
+bin/astra-jev cli apply --run /absolute/run
 ```
 
-`run` writes a candidate outside the target. `apply` accepts only verified, unchanged artifacts and leaves changes uncommitted. `verify --run ...` reruns verification without another model call. New files and existing test edits require explicit plan flags: `--allow-create path` and `--allow-test-edit path`. [CLI details](docs/CLI.md).
+`run` writes an isolated candidate. `apply` accepts verified, unchanged artifacts and leaves edits uncommitted. `verify --run ...` reruns the recorded test command without another model call. New files and existing test edits need explicit plan flags: `--allow-create` and `--allow-test-edit`. [CLI details](docs/CLI.md).
 
 ## What it does
 
@@ -205,12 +217,12 @@ Select before loading bodies into the conversation, then use `read --selection /
 
 ```sh
 # Direct helper: an explicitly requested auto-mode comparison, not the Skill entrypoint.
-python3 "Codex Desktop/context.py" plan --repo /absolute/repo \
+bin/astra-jev desktop plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan
-python3 "Codex Desktop/context.py" select --plan /absolute/plan \
+bin/astra-jev desktop select --plan /absolute/plan \
   --out /absolute/selection --max-calls 4 --mode auto
-python3 "Codex Desktop/context.py" check --selection /absolute/selection
-python3 "Codex Desktop/context.py" compare --selection /absolute/selection \
+bin/astra-jev desktop check --selection /absolute/selection
+bin/astra-jev desktop compare --selection /absolute/selection \
   --required-file src/main.py
 ```
 
@@ -223,7 +235,7 @@ When eligible files exceed **2,000,000 bytes, 1,500 files, or the planned reques
 Use repeated `--focus-file` paths for eligible files you know the task needs. `--scope-max-calls` caps the **planned** Jev requests for the candidate scope (default 4, range 1–24); the later `select --max-calls` execution cap remains separate. Untracked files still require `--include-file`. A focus path cannot bypass eligibility or the 100 KB per-file limit.
 
 ```sh
-python3 "Codex Desktop/context.py" plan --repo /absolute/repo \
+bin/astra-jev desktop plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan \
   --focus-file src/pagination.py --focus-file tests/test_pagination.py \
   --scope-max-calls 4

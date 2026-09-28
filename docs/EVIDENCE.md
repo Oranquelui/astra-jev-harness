@@ -9,7 +9,7 @@ The harness can now select **original excerpts** from explicitly supplied evalua
 All artifact directories and caches must be outside source repositories. Use your own configured TypeSafe key. Planning, freshness checks, and measurement are local.
 
 ```sh
-python3 evidence.py plan --task-file /absolute/task.txt \
+bin/astra-jev evidence plan --task-file /absolute/task.txt \
   --source /absolute/evaluation-review.md \
   --source /absolute/changes.diff \
   --pin-source /absolute/status-and-budget.json \
@@ -21,10 +21,10 @@ Review `PLAN.md` and `plan.json`. **Pin all failure/status, budget, and authoriz
 ### Select and consume
 
 ```sh
-python3 evidence.py select --plan /absolute/evidence-plan \
+bin/astra-jev evidence select --plan /absolute/evidence-plan \
   --out /absolute/evidence-selection --max-calls 4 \
   --cache-dir /absolute/private-jev-cache
-python3 evidence.py check --selection /absolute/evidence-selection
+bin/astra-jev evidence check --selection /absolute/evidence-selection
 ```
 
 Selection uses up to the reviewed request count, with no automatic retry. `selection.json` records attempted live calls, cached responses, usage, probabilities, time and safe failure diagnostics. `packet.json` contains verbatim excerpts, original absolute paths, source SHA-256 and one-based start/end lines. Selection transmits the task and excerpt data to TypeSafe, not the local absolute source paths. Artifacts contain source text: never commit them.
@@ -34,11 +34,11 @@ The policy keeps pinned and unjudged excerpts and any excerpt whose relevance, c
 Use the **same task file** for the repository plan and evidence plan. Then either surface can attach a fresh packet:
 
 ```sh
-python3 "Codex Desktop/context.py" select --plan /absolute/repo-plan \
+bin/astra-jev desktop select --plan /absolute/repo-plan \
   --out /absolute/context-selection --max-calls 4 \
   --evidence /absolute/evidence-selection
 
-python3 "Codex cli/main.py" run --plan /absolute/cli-plan \
+bin/astra-jev cli run --plan /absolute/cli-plan \
   --out /absolute/cli-run --mode jev \
   --evidence /absolute/evidence-selection \
   --verify-json '["python3", "-m", "unittest", "discover"]'
@@ -61,7 +61,7 @@ Dependency preservation now covers conventional Python `src/` roots, local TypeS
 ### Compare complete recorded runs
 
 ```sh
-python3 measure.py --baseline /absolute/astra-only/result.json \
+bin/astra-jev measure --baseline /absolute/astra-only/result.json \
   --candidate /absolute/hybrid/result.json \
   --candidate /absolute/evidence-selection/selection.json
 ```

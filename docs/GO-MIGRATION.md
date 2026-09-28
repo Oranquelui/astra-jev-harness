@@ -1,52 +1,75 @@
-# Go migration: correctness, cost and speed
+# Go runtime migration
 
-Status: implementation and evaluation of the first compatibility slice. The user approved proceeding with Go on 2026-09-28, prioritizing coding accuracy, cost and speed. This supersedes bundled CPython as the intended migration direction; v0.6.0 remains the supported Python runtime until the replacement passes its gates.
+The approved migration replaces the normal Harness runtime with `bin/astra-jev`. The Desktop and Claude Code Skill launchers are POSIX `.sh` wrappers around that executable; they do not start Python, compile code, install a toolchain, benchmark, or compare models during coding. Version 0.7.0 is the native release line. The earlier v0.6.0 tag remains the Python rollback reference.
 
-## First working slice
+## Implemented scope
 
-Build `astra-jev-core`, a local JSON-lines executable with no Python or provider dependency. Implement reusable Go primitives for Python import extraction, Python-compatible canonical JSON/request hashes, and byte-bounded original-source views. Use pinned Tree-sitter/Python grammar rather than replacing Python AST analysis with regular expressions. C compilation is a build dependency; do not claim pure-Go cross-compilation or universal OS support.
+- Repository planning, lexical scoping, complete source-range batching and request budgets; path, symlink, file-size, source-hash, mode, Git HEAD/branch/status and credential guards.
+- Tree-sitter Python import extraction, Python package/src-root and JS/TS alias/workspace closure; Go source, go.mod/go.work and local package/module dependency closure. Python syntax uncertainty conservatively retains Python scope. Dynamic imports and arbitrary build configurations remain partial.
+- Exact Python-compatible canonical JSON/request hashes, strict Jev response validation, exact-request cache reuse, scoped environment/Keychain credentials, fixed-origin HTTPS transport, no redirects and no automatic retries. Each attempt is saved before a request.
+- Separate Desktop/Claude surfaces: plan/select/check/read/present/discover/compare, preserved Jev-required Desktop Skill checks and original-source byte caps.
+- Extractive evidence packets; explicitly routed progress-output selection with one child execution, original stderr/exit status, bounded buffering, private stdout archive and full-output fallback on failure. Receipt comparison remains an explicit offline command; missing spend stays unknown.
+- CLI configuration read through the user's installed Codex, isolated generation with the configured model/effort, at most one context expansion, candidate verification/reverification and explicit transactional apply. Test/instruction protections, new-file grants, freshness checks and partial rollback reporting are retained. Desktop does not call the CLI generator.
+- Native Skill installation with read-only check, idempotence, legacy-link migration and refusal to overwrite another Skill. No user authentication or model configuration is copied or rewritten.
 
-The executable is an offline compatibility tool, not a replacement for the host's `select/check/present` workflow. It neither reads repositories nor validates saved Jev selections. It must not become a way to bypass freshness, scope, secret filtering or Jev-required checks.
+The coherent cutover exceeds the usual small-patch size: context planning, cache serialization, saved handoffs, both host adapters and installation share the same contracts. Splitting their runtime activation would leave mixed interpreters and inconsistent artifact readers. The prior compatibility-core commit remains a separate reviewable checkpoint; Python references are retained for offline regression checking.
 
-## Acceptance and measurements
+## Build, use and rollback
 
-- Compare against the existing Python implementation on independently specified edge cases and tracked Python files. Normalize only irrelevant import traversal ordering. Compare canonical bytes/hashes and every excerpt/page field exactly. Syntax disagreement is an explicit failed compatibility case, never evidence that a source has no dependencies.
-- Test malformed inputs, Unicode/CRLF, aliases, relative/nested/multiline imports, comments/strings containing fake imports, large integers, floating-point serialization, truncated views, long lines and output budgets. Preserve unavailable/unsupported states explicitly.
-- Run the native executable with an empty PATH. Keep Python solely in the development comparison runner; native tests and the binary must run without it.
-- Timing is optional and off by default. The user clarified that recurring measurements during coding would waste time/tokens. Only a one-time local migration check uses matched inputs/output obligations; no runtime instrumentation, per-task A/B runs, additional model calls or automatic benchmark are added. Report sample count and timing limits; do not infer end-to-end coding speed or quality from local timing.
-- Record live development-selection attempts, completed requests, cache reuse and tokens separately. Migrating the implementation language must not add product API requests or automatic retries. No inference/token/cost reduction is established by this slice.
+Source builds require Go 1.26+ and a C compiler. The pinned Tree-sitter Python grammar and parser are linked into the executable; Go and Python are not runtime prerequisites. C compilation means this is not a pure-Go cross-compilation promise.
 
-## Remaining migration after this gate
+```sh
+scripts/build-native.sh
+bin/astra-jev --help
+bin/astra-jev install --check
+bin/astra-jev install
+# Claude Code uses its own destination:
+bin/astra-jev install --target claude-code --check
+```
 
-Port snapshot/path safety, full dependency closure, scoping/chunking, Jev transport/cache/usage, host freshness checks and commands, evidence/output/measurement, CLI generation/apply, and installation. Preserve separate host contracts and the existing result formats. Test failure, cancellation, symlinks, permissions, cost limits and rollback before replacing any entrypoint. Retain the v0.6.0 release as the rollback target.
+Platform archives contain `bin/astra-jev`, Skill files, current guides and dependency notices; `.py` scripts and Python caches are excluded. Extract into a permanent directory, verify the archive's SHA-256 against the accompanying checksum, then run `bin/astra-jev install`. Keep that directory while its Skill symlink is installed. macOS arm64 and Linux amd64 are built/tested independently in CI; other platforms require separate verification. No platform is established by a cross-compile alone.
 
-Cutover requires all supported commands and the installer to work without Python, equivalent regression coverage and supported-platform builds. Verify unchanged model inputs, request counts, budget/failure handling and cache semantics locally. Reuse available execution receipts for cost observations; do not require extra live generations merely to port an unchanged contract. Any later live coding A/B evaluation is a separate explicitly scoped activity, never a routine step in coding. It must use the same tasks, source revisions, model/effort and independent acceptance tests and include all Jev/Astra calls, failures, retries and elapsed time. The active Desktop conversation must not launch a second Codex for generation.
+For rollback, keep local edits and run outputs, select the v0.6.0 checkout in a separate directory, and explicitly repoint only the Skill symlink owned by this installation. The installer deliberately refuses to replace an unrelated checkout's link. Old `.py` entrypoints stay in source checkouts for compatibility/development; use Python 3.10+ when deliberately running them. Python 3.14 is required by the full development oracle's 3.14 syntax fixtures. The historical synthetic Python benchmark is a development experiment, not a native production command.
 
-No version bump, public release, global Skill replacement or default selection-policy change is part of the first compatibility slice.
+## Native commands
 
-## Build and check this slice
+| Previous source entrypoint | Native entrypoint |
+|---|---|
+| `python3 "Codex Desktop/context.py"` | `bin/astra-jev desktop` |
+| `python3 "Claude Code/context.py"` | `bin/astra-jev claude-code` |
+| `python3 "Codex cli/main.py"` | `bin/astra-jev cli` |
+| `python3 evidence.py` | `bin/astra-jev evidence` |
+| `python3 output.py` | `bin/astra-jev output` |
+| `python3 measure.py` | `bin/astra-jev measure` |
+| `python3 install.py` | `bin/astra-jev install` |
 
-Go 1.26+ and a C compiler are needed to build; Python 3.14 is needed only for the development comparison against v0.6.0, including Python 3.14 syntax fixtures. Users of the compiled core need neither Python nor Go. Tree-sitter and the Python grammar are linked into the executable. Build each OS/CPU artifact and test it there; do not infer cross-platform support from one macOS build.
+An absolute `bin/astra-jev` path works from another directory. Skill `.sh` launchers resolve the physical checkout behind installed symlinks. Project tests may require Python, Node, Go or another project runtime; that requirement belongs to the explicit test command, not Harness startup. Existing v1/v2 snapshots and receipt shapes are read directly. Hashes are canonical across JSON key ordering; native JSON files may have different whitespace/key order. Decimal cost strings use a normalized exact decimal representation. Go-inclusive snapshots are a native extension and are not readable by the older Python snapshot validator.
+
+## Verification without recurring overhead
 
 ```sh
 go test ./...
+go vet ./...
+# Explicit migration-only oracle; synthetic inputs, no provider calls or timing:
+ASTRA_JEV_REFERENCE_PYTHON="$(command -v python3)" go test ./internal/harness
 go build -trimpath -o /tmp/astra-jev-core ./cmd/astra-jev-core
-python3 scripts/compare_native.py --binary /tmp/astra-jev-core --out /tmp/native-comparison.json
+python3 scripts/compare_native.py --binary /tmp/astra-jev-core --out /tmp/native-compatibility.json
 ```
 
-The last command runs compatibility checks only. Explicit `--samples 3` adds a small local timing check when needed; this is not called by the Skill, the product or normal coding commands. Result files stay outside Git.
+The optional `ASTRA_JEV_TEST_GO` test builds a temporary binary and starts it with an empty PATH. CI also builds the real executable and validates the package. Native tests cover cached selections, identical Jev payloads/hashes/decisions, dependency closure, freshness and host boundaries, budget rejection before credentials/output creation, malformed response/cache records, HTTP failure/redirects, evidence tampering, output fallback/streaming/credential isolation, usage unknowns, configured-model CLI runs with fake Codex, explicit apply, occupied destinations and rollback preserving concurrent changes. Race checks use local fixtures only.
 
-Send one JSON object per line to the binary. Operations are `imports` (`source`), `hash` (`value`), `excerpt` (`path`, `text`, `start_line`, `lines`), and `page` (`base`, `items`, `offset`, `max_bytes`). `imports` returns normalized static module/name/relative-level records; it does not implement dependency closure or execute source. Input lines are bounded to 2 MB and Python sources to 100 KB. The first syntax/validation error in a request returns an explicit error; processing continues for subsequent lines and the process exits 2 if any request failed. No source text is printed in error diagnostics.
+The retained Python baseline and first-core reference checks complement these native tests; passing the old Python suite alone is not evidence that the Go port works. No live coding generation or timing comparison is required for the language cutover. Normal execution has no added A/B, benchmark or automatic compilation path.
 
-Go decoding preserves arbitrary JSON integers and the distinction between integer and floating-point tokens for Python-compatible request hashing. Invalid UTF-8, unpaired Unicode surrogates and nonfinite JSON numbers are rejected rather than silently rewritten. The parser is an import extractor, not a complete CPython syntax validator; passing a finite compatibility suite is not a proof of equivalence for all Python programs.
+## Evidence and limits
 
-## Local evidence — 2026-09-28
+The first compatibility-core checkpoint had 1,180 matched local cases and 199 passing Python tests. A small optional three-sample startup check was recorded at that earlier checkpoint; it is not an end-to-end speed claim and is not rerun in this migration. Timing defaults to zero in the development comparator.
 
-- Existing Python baseline: 199 tests passed; the production Python implementation remains unchanged.
-- Native Go unit and protocol tests passed (10 tests), including race-enabled execution; `go vet` passed. The comparison executable ran with an empty PATH and without credentials or a Python/Go executable on PATH. The native CI workflow is prepared but has not been run remotely for this local change.
-- First comparison: 1,178 cases matched, including 55 tracked Python files, 15 targeted import cases, 1,010 canonical JSON/hash cases, 63 excerpts and 35 pages. Five cases were rejected by both implementations. Subsequent tracked-file additions increase the fixture count automatically.
-- Final correctness-only check: 1,180 cases matched, including the two new reference/comparison scripts. Timing results were empty, verifying that the default performs no repeated timing runs.
-- One-time smoke timings only: macOS 26.6.2 arm64, Python 3.14.7, Go 1.27.1, three alternating samples per implementation. Median startup plus one hash: Python 79.591 ms, Go 4.550 ms. Median full matched batch including startup: Python 156.566 ms, Go 96.713 ms. These are small local samples, not a stable performance benchmark or a coding-speed claim. No timing run is triggered by ordinary coding or CI.
-- Local binary: 5,414,818 bytes with the build command above. Size is build/platform-specific. This is not a published release artifact.
-- Comparison provider calls/tokens: zero. Development-context selection was separate: 6 live attempts, 6 completed, 0 reused, 43,469 input / 483 output Jev tokens. No child Codex generation ran.
-- End-to-end coding correctness, total provider cost and coding speed have not been compared. The core has no provider transport, so zero calls here is not a prediction about a complete coding task. Full Python removal is still incomplete.
+This runtime migration uses bounded Jev development-context selection separately from tests: 8 attempts, 8 completed, no cache reuse; 61,888 input / 782 output Jev tokens. Test servers and fake Codex executables are local fixtures, not live model evaluations. Complete conversation token use, total provider cost savings, coding quality improvement and task-completion speed have not been measured. Removing interpreter setup/startup is an implementation fact; a numeric coding-speed or savings claim would require a separately authorized evaluation.
+
+## Local verification at runtime cutover (2026-09-29)
+
+- 30 native Go tests passed, including race-enabled execution and `go vet`; migration-only tests used synthetic Python fixtures and fake Codex, not a real generation.
+- 199 retained Python tests passed; all 1,181 final core compatibility cases matched, with timing disabled.
+- Native-to-Python and Python-to-native plan/selection checks passed. The installed-style `.sh` Skill resolved the correct checkout and rejected no-Jev and stale handoffs.
+- The native workflow ran with a PATH containing only Git/dirname and failing traps named python, python3 and go. No interpreter/compiler trap ran, no live provider was called, and no timing sample was taken.
+- Platform CI and public release verification are recorded by their GitHub runs; local macOS evidence alone is not Linux evidence.

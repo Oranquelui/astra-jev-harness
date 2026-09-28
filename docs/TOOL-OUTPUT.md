@@ -8,12 +8,12 @@ Write an explicit task brief (UTF-8, up to 4,000 bytes) containing the outcome, 
 
 ```sh
 # From the harness checkout; use absolute paths when working elsewhere.
-python3 output.py --task-file /absolute/task.txt \
+bin/astra-jev output --task-file /absolute/task.txt \
   --out /absolute/new-directory-outside-git --max-calls 2 \
   --keep-text release-target -- npm run build
 
 # Through an installed Desktop Skill symlink:
-python3 ~/.codex/skills/astra-jev-coding/scripts/output.py \
+~/.codex/skills/astra-jev-coding/scripts/output.sh \
   --task-file /absolute/task.txt --out /absolute/new-directory-outside-git \
   -- npm run build
 ```

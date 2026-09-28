@@ -32,3 +32,6 @@ secrets.json
 *.pfx
 *.sqlite
 *.db
+
+# Native binaries are built once or downloaded as platform release assets.
+bin/

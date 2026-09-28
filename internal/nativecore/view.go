@@ -129,3 +129,6 @@ func Page(base map[string]any, candidates []map[string]any, offset, limit int) (
 	}
 	return result, nil
 }
+
+// SplitLines preserves original terminators, matching bounded source views.
+func SplitLines(text string) []string { return splitLines(text) }

@@ -9,7 +9,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux-amd64
+          - os: macos-latest
+            platform: darwin-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -19,7 +23,23 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.14'
-      - run: go test ./...
+      - name: Native contract and failure-path tests
+        run: |
+          ASTRA_JEV_REFERENCE_PYTHON="$(command -v python)" ASTRA_JEV_TEST_GO="$(command -v go)" go test -race ./...
+          go vet ./...
+      - run: scripts/build-native.sh
+      - run: python scripts/check_native_runtime.py --binary bin/astra-jev
+      - name: Verify runtime without Python or Go on PATH
+        run: |
+          mkdir "$RUNNER_TEMP/empty-path"
+          PATH="$RUNNER_TEMP/empty-path" ./bin/astra-jev --help
+          ./bin/astra-jev install --check --skills-dir "$RUNNER_TEMP/test-skills"
       - run: go build -trimpath -o "$RUNNER_TEMP/astra-jev-core" ./cmd/astra-jev-core
-      # Correctness only: default samples=0; no timing or provider calls in CI.
+      # Local correctness only; timing defaults to zero and no providers are used.
       - run: python scripts/compare_native.py --binary "$RUNNER_TEMP/astra-jev-core" --out "$RUNNER_TEMP/native-compatibility.json"
+      - run: scripts/package-native.sh "$RUNNER_TEMP/release" '${{ matrix.platform }}'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-${{ matrix.platform }}
+          path: ${{ runner.temp }}/release/*
+          if-no-files-found: error

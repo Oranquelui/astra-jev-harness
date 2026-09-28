@@ -1,6 +1,6 @@
 # CLI reference
 
-Run from the repository root. Use `python3 "Codex cli/main.py" --help` for the parser; the root `coding.py` remains a compatibility entrypoint without Keychain supplementation.
+Run from the repository root. Use `bin/astra-jev cli --help` for the parser; the root `coding.py` remains a compatibility entrypoint without Keychain supplementation.
 
 1. `plan --repo ROOT --task-file TASK --out PLAN`: snapshot eligible tracked files locally, outside the source repository. Above 2 MB or 1,500 eligible files, add reviewed `--focus-file PATH` values and optionally `--scope-max-calls N` (default 4) to bound the local shortlist before Jev. Review retained and `scoped_out` paths in `PLAN.md`; required-file recall is unknown without labels. Preserve existing changes.
 2. `run --plan PLAN --out RUN --mode jev --verify-json '["python3","-B","-m","unittest","discover"]'`: select context, generate full-file replacements using your Codex login, and verify an isolated candidate. Adapt the argument-array verification command to your project. Do not pass a shell string. `auto` skips Jev for a small context; an explicit Jev request should use `jev`.
@@ -12,7 +12,7 @@ Run from the repository root. Use `python3 "Codex cli/main.py" --help` for the p
 Declare task-authorized changes during planning:
 
 ```sh
-python3 "Codex cli/main.py" plan --repo /absolute/repo \
+bin/astra-jev cli plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan \
   --allow-create src/helper.py \
   --allow-create tests/test_helper.py \
