@@ -4,7 +4,7 @@
 
 [`claude-jev-coding`](skills/claude-jev-coding/SKILL.md)は、Claude Codeで使うエージェントスキルです。現在のClaude Codeセッションが通常のツールで実装・レビュー・変更に応じた検証を行い、Jevはファイルの関連性だけを判定します。`Claude Code/context.py`は、Codex Desktop版と共通の選別処理（`shared/host_context.py`）を呼び出すツールです。Codex・Astra・別のコーディングエージェントを起動することはありません。
 
-Python 3.10以上とGitが必要です。追加のPythonパッケージは不要です。
+ビルド済みの`bin/astra-jev`とGitが必要です。Harnessの実行にPythonは不要です。
 
 ## インストールと確認
 
@@ -12,23 +12,23 @@ cloneしたハーネスのリポジトリルートで実行します。
 
 ```sh
 # インストール予定の内容だけを表示。書き込みは行いません。
-python3 install.py --target claude-code --check
+bin/astra-jev install --target claude-code --check
 
 # ~/.claude/skills/claude-jev-coding にリンクを作成します。
-python3 install.py --target claude-code
+bin/astra-jev install --target claude-code
 
 # 特定プロジェクトだけで使う場合は、代わりに配置先を指定します。
-python3 install.py --target claude-code --skills-dir "/absolute/project/.claude/skills"
+bin/astra-jev install --target claude-code --skills-dir "/absolute/project/.claude/skills"
 ```
 
 インストーラーは、このcloneを指すシンボリックリンクを１つ作成します。再実行時は`already-installed`と表示します。同名の別ファイル・ディレクトリ・シンボリックリンクがある場合は、リンク切れであっても上書きしません。Claude CodeやTypeSafeの認証情報を読み取ったりコピーしたりせず、設定・モデル・権限も変更しません。
 
-リンク先となるcloneは移動・削除せず保持してください。アンインストールする場合は、作成されたリンクだけを削除します。`--target`を付けずに`python3 install.py`を実行した場合は、従来どおりCodex Desktop用Skillをインストールします。
+リンク先となるcloneは移動・削除せず保持してください。アンインストールする場合は、作成されたリンクだけを削除します。`--target`を付けずに`bin/astra-jev install`を実行した場合は、従来どおりCodex Desktop用Skillをインストールします。
 
 個人用ディレクトリにインストールした場合は、次で確認できます。
 
 ```sh
-python3 ~/.claude/skills/claude-jev-coding/scripts/context.py doctor
+~/.claude/skills/claude-jev-coding/scripts/context.sh doctor
 ```
 
 `doctor`は`"surface": "claude-code"`、リンク先のcheckout、APIキーを利用できるかを表示します。キーの値は表示せず、プロバイダーAPIも呼び出しません。

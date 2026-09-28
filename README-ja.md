@@ -12,7 +12,28 @@ Codex CLI・Codex Desktop・Claude Code向けのローカルCoding Harnessです
 
 **実験段階です。** 過去の**v0.3.0**で、**Astra Extra High（`xhigh`）**で合成CLI課題を修正・テストまで比較すると、**Astra入力27.0%減、Jev込みのStandard API単価換算27.2%減**でした。両方式とも同じ6件の確認に成功。所要時間はこの比較では7.3%減でしたが、別の`medium`比較では34.6%増でした。各方式1試行であり、一般的な高速化やDesktopでの効果は示しません。[測定条件と結果](docs/BENCHMARKS.md)。
 
+## v0.7.0：Pythonが不要なGo実行版
+
+通常のHarness、両Skillの入口、installerを、ビルド済みの **`bin/astra-jev`** に移しました。Harnessを使うためのPythonは不要です。ソースからビルドする場合だけGoとCコンパイラを使い、配布archiveには実行ファイルとSkillを同梱します。対象プロジェクトのテストに必要な言語環境は別途必要です。
+
+| 対象 | v0.6.0 | v0.7.0 |
+|---|---|---|
+| 起動・導入 | Pythonと各種スクリプト | 一度ビルド、または配布archiveから展開した実行ファイル |
+| Desktop／Claude Code | Pythonのplan/select/check/read | 同じhost境界を守るGoのplan/select/check/read/present/discover/compare |
+| CLI | Pythonの候補生成・適用 | Goの候補生成、再検証、明示apply、失敗時の復旧 |
+| コンテキスト保護 | snapshot・hash・依存解析 | path／symlink／秘密情報の検査、鮮度確認、互換JSON／hash、呼び出し上限、cache検証 |
+| 言語の依存解析 | PythonとJS／TS | Tree-sitterによるPython解析、既存JS／TS解決、Goのpackage／module依存 |
+| 補助処理 | Pythonの資料・進捗ログ・使用量処理 | Goのevidence/output/measure。ログ対象コマンドは一度だけ実行 |
+| 普段のCodingの負荷 | 比較コマンドは任意 | ベンチマーク、繰り返し計測、モデルA/B、自動ビルド、追加APIは導入しない |
+
+正確さのため、Jevへの送信内容、cache key、不確実なファイルの保持、失敗処理を維持し、既存実装とローカルで照合します。Python構文の解析に不確実性があれば関連Pythonファイルを保持します。テスト・指示ファイルの保護、新規ファイルの明示許可、検証済み候補のhash照合、失敗時の復旧も維持します。費用・usageの欠測は不明のまま扱います。`measure`は明示実行時に保存記録を読む機能で、裏で常時計測しません。
+
+今回の直接の改善は、Python環境の準備と毎回のインタープリタ起動が不要になることです。**Coding token、総費用、課題完了時間の削減率は今回実測していません。** 移植検証には一時repoとローカルの疑似プロバイダーを使い、実モデルの比較実行はしません。下記の過去ベンチマークは当時のversionの結果です。
+
+ソースrepo内の`.py`実装とPython用の過去ベンチマークは、開発・互換性確認用として残します。ネイティブ配布archiveには含めず、通常コマンドとインストール済みSkillの`.sh`入口から実行しません。小さな`astra-jev-core`は独立したオフライン開発用ツールです。[移植範囲・互換性・ビルド](docs/GO-MIGRATION.md)。
+
 ## v0.6.0：原文の提示上限・段階的なファイル発見・使用量集計の改善
+
 
 保持したcontextの読み方、最初の候補外にあるファイルの探し方、補助処理で使ったJevの使用量集計を改善しました。新しい`present`・`discover`はCodex DesktopとClaude Codeで使え、`measure.py`の改善はCLIの作業集計にも使えます。
 
@@ -57,7 +78,7 @@ python3 "Codex Desktop/skills/astra-jev-coding/scripts/context.py" discover \
 
 実装時のJevは**12回試行・12回完了（入力83,571／出力813 token）、cache再利用0回**でした。37候補はすべて保持されました。その保存済み選別をローカルで歴史的に再生すると、**原文267,517 bytesの保持を維持**しながら、初回提示は7ファイル・**JSON全体5,750 bytes（原文3,459 bytes）**になりました。再生時の**追加APIは0回**です。これは選別と表示量の確認で、**Astra token、総費用削減、再読込、coding品質、完了時間の改善は未測定**です。以下に残したv0.3.0の過去ベンチマークを、v0.6.0の成果として扱いません。[実装・検証記録](docs/IMPROVEMENT-RESULTS-20260928.md)。
 
-既存cloneの変更を保持してv0.6.0へ更新し、`python3 install.py --check`（Claude Codeは`--target claude-code`を追加）でSkillの参照先を確認してください。既存のPython入口・保存記録・選別policy・方式分離は継続します。**Python 3.10以上は引き続き必要**で、[Python同梱配布案](docs/PYTHON-DISTRIBUTION-PROPOSAL.md)は今回未実装です。課題全体の共有予算、自動retry、構文単位の選別、batch/cacheの既定変更も含みません。
+**v0.6.0当時の手順です。現行版は下記のv0.7.0導入手順を使います。** 既存cloneの変更を保持してそのtagへ更新し、`python3 install.py --check`（Claude Codeは`--target claude-code`を追加）でSkillの参照先を確認してください。既存のPython入口・保存記録・選別policy・方式分離は継続します。**v0.6.0にはPython 3.10以上が必要でした**で、[Python同梱配布案](docs/PYTHON-DISTRIBUTION-PROPOSAL.md)は今回未実装です。課題全体の共有予算、自動retry、構文単位の選別、batch/cacheの既定変更も含みません。
 
 ## v0.5.1：Desktop SkillでJev判定を必須化
 
@@ -106,18 +127,19 @@ Codex Desktop Skillを更新し、全範囲判定と集計はCLIでも使えま�
 | Jevの役割 | 生成前のコンテキスト選別 | 現在の会話が読むファイルの選別 | 現在のセッションが読むファイルの選別 |
 | 手順 | `plan → run → verify → apply` | `plan → select → check → 会話で実装・変更に応じた検証` | Desktopと同じ |
 | 対象への書き込み | 検証後の明示的な`apply` | Desktopの通常の編集ツール | Claude Codeの通常のツールと許可確認 |
-| 入口 | `python3 "Codex cli/main.py"` | `python3 "Codex Desktop/context.py"`またはSkill | `python3 "Claude Code/context.py"`または`/claude-jev-coding` |
+| 入口 | `bin/astra-jev cli` | `bin/astra-jev desktop`またはSkill | `bin/astra-jev claude-code`または`/claude-jev-coding` |
 
 DesktopとClaude Codeは、コード生成のために別のコーディングエージェントを起動しません。どの方式も、ホストのモデルメニューへJevを登録する機能ではありません。
 
 ## はじめに
 
-必要なのはPython **3.10以上**、Git、利用するホストです。Codex方式にはCodex、Claude SkillにはClaude Codeを使います。実際にJevへ照会する場合は自分のTypeSafe APIキーが必要で、ローカル選別では不要です。追加Pythonライブラリは不要です。Codexの測定環境はmacOS・Python 3.14・Codex CLI 0.153.2です。他のOSやCodexバージョンの動作をこの測定で保証するものではありません。CLI生成には自分のCodexアカウントで設定したモデルを利用でき、`codex sandbox`が動く必要があります。使用するCodexのフラグはバージョンに依存します。
+必要なのはGit、OS／CPUに合うネイティブ実行ファイル、利用するホスト（CodexまたはClaude Code）です。配布archive利用時はPythonもGoも不要です。ソースからのビルドだけGo 1.26以上とTree-sitter用Cコンパイラが必要です。配布対象はmacOS arm64とLinux amd64で、それ以外は別途ビルド・検証してください。CLI生成には自分のCodexアカウントと動作する`codex sandbox`が必要で、フラグはCodexのversionに依存します。Jevへ送信する場合は自分のTypeSafe APIキーを使います。
 
 ```sh
 git clone https://github.com/Oranquelui/astra-jev-harness.git
 cd astra-jev-harness
-python3 -m unittest -v
+scripts/build-native.sh
+bin/astra-jev --help
 ```
 
 **認証情報は利用者自身のものを使います。**
@@ -128,7 +150,7 @@ export TYPESAFE_API_KEY="YOUR_OWN_TYPESAFE_API_KEY"
 
 # CLIで生成する場合だけ、必要に応じて自分のCodexアカウントへログイン。
 codex login
-python3 "Codex cli/main.py" doctor
+bin/astra-jev cli doctor
 ```
 
 作者のAPIキー、Codexログイン、Cookie、認証ファイルは配布物に含まれません。実キーをGitへ追加しないでください。`doctor`はキーの値を表示せず、外部APIも呼びません。環境変数を優先し、macOSでは設定済みのlogin Keychain（service `astra-jev-harness`、account `TYPESAFE_API_KEY`）も使用できます。installerはそのキーの作成や他人のアカウントの共有を行いません。
@@ -136,8 +158,8 @@ python3 "Codex cli/main.py" doctor
 ### Codex Desktopで使う
 
 ```sh
-python3 install.py --check
-python3 install.py
+bin/astra-jev install --check
+bin/astra-jev install
 ```
 
 `$CODEX_HOME/skills`（既定`~/.codex/skills`）へDesktop用Skillの参照リンクだけを作成します。別のSkillの上書きは拒否し、モデル設定を変更したりログインを読み取ってコピーしたりしません。cloneしたディレクトリは残してください。アンインストール時はinstallerが作った`astra-jev-coding`のsymlinkだけを削除します。候補に反映されなければ新しいCodexタスクを開いてください。
@@ -157,38 +179,30 @@ Desktop Skillの呼び出しはJev選別を使う依頼として扱います。�
 ### Claude Codeで使う
 
 ```sh
-python3 install.py --target claude-code --check
-python3 install.py --target claude-code
-python3 ~/.claude/skills/claude-jev-coding/scripts/context.py doctor
+bin/astra-jev install --target claude-code --check
+bin/astra-jev install --target claude-code
+~/.claude/skills/claude-jev-coding/scripts/context.sh doctor
 ```
 
 `~/.claude/skills`へ`claude-jev-coding`の参照リンクだけを作成します。プロジェクト単位で使う場合は`--skills-dir "/absolute/project/.claude/skills"`を指定します。上書き拒否・認証情報を扱わない点はDesktop版と同じで、何度実行しても結果は変わりません。`doctor`は`"surface": "claude-code"`とキーの有無を表示し、キーの値は表示しません。TypeSafeキーは自分のものを、環境変数または同じ任意のKeychain項目から使います。対象リポジトリでClaude CodeにJevで選別した変更を依頼するか、`/claude-jev-coding <課題>`で明示的に呼び出します。Skillはツールを事前承認せず、モデル・effortも変更せず、contextもforkしません。[Claude Codeの詳細](Claude%20Code/README-ja.md)。
 
 2026-09-24にClaude Code 2.1.281で、Skillの検出・起動、plan/select/check/行範囲の読み取り、Claudeによる編集、テスト用コードの３件成功までローカルで確認しました。この確認は`--mode local`（Jev呼び出し０回）で行っており、Jev実接続やtoken削減のベンチマークではありません。当時のハーネス全体のオフラインテストは141件成功しました。
 
-### CLIで試す：合成リポジトリ
+### CLI：自分のリポジトリで使う
 
-cloneしたルートから実行します。plan/runの出力先は対象repo外の、まだ存在しないディレクトリを指定します。
+課題を`/absolute/task.txt`へ書き、対象repo外の新しい保存先を指定します。`PLAN.md`を確認し、検証コマンドは対象プロジェクトに合わせます。
 
 ```sh
-DEMO_ROOT=$(mktemp -d)
-python3 make_demo.py "$DEMO_ROOT/repo"
-printf '%s\n' 'page_itemsを修正。ページ番号は1始まり。pageと明示的sizeは1以上へ補正し、sizeがNoneのときだけDEFAULT_PAGE_SIZEを使う。APIとテストを保持する。' > "$DEMO_ROOT/task.txt"
-
-# ローカル確認のみ。外部送信前にPLAN.mdを読む。
-python3 "Codex cli/main.py" plan --repo "$DEMO_ROOT/repo" \
-  --task-file "$DEMO_ROOT/task.txt" --out "$DEMO_ROOT/plan"
-
-# 外部プロバイダー利用：最大Jev 24回、Astra生成2回。
-python3 "Codex cli/main.py" run --plan "$DEMO_ROOT/plan" \
-  --out "$DEMO_ROOT/run" --mode jev \
-  --verify-json '["python3", "-B", "-m", "unittest", "discover"]'
-
-# REPORT.md、changes.diff、検証出力を確認してから適用。
-python3 "Codex cli/main.py" apply --run "$DEMO_ROOT/run"
+bin/astra-jev cli plan --repo /absolute/target/repo \
+  --task-file /absolute/task.txt --out /absolute/plan
+# この明示runでプロバイダーを呼びます。
+bin/astra-jev cli run --plan /absolute/plan --out /absolute/run --mode jev \
+  --verify-json '["go", "test", "./..."]'
+# 保存された差分と検証結果を確認後に適用。
+bin/astra-jev cli apply --run /absolute/run
 ```
 
-`run`は対象外に候補を作ります。`apply`は検証済みで改変のない成果物だけを適用し、コミットしません。`verify --run ...`はモデルを再呼び出さず検証できます。新規ファイルは`plan --allow-create path`、既存テスト更新は`--allow-test-edit path`で明示します。[CLIの詳細](docs/CLI.md)。
+`run`は隔離した候補を作り、`apply`は検証済みで変更されていない候補だけを適用します。commitはしません。`verify --run ...`はモデルを再度呼ばずに検証します。新規ファイルは`--allow-create`、既存テストの編集は`--allow-test-edit`をplanに明示します。[CLI詳細](docs/CLI.md)。
 
 ## 特徴
 
@@ -203,12 +217,12 @@ python3 "Codex cli/main.py" apply --run "$DEMO_ROOT/run"
 
 ```sh
 # 明示的に依頼されたauto方式の比較。Skillの入口ではなくhelperを直接実行します。
-python3 "Codex Desktop/context.py" plan --repo /absolute/repo \
+bin/astra-jev desktop plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan
-python3 "Codex Desktop/context.py" select --plan /absolute/plan \
+bin/astra-jev desktop select --plan /absolute/plan \
   --out /absolute/selection --max-calls 4 --mode auto
-python3 "Codex Desktop/context.py" check --selection /absolute/selection
-python3 "Codex Desktop/context.py" compare --selection /absolute/selection \
+bin/astra-jev desktop check --selection /absolute/selection
+bin/astra-jev desktop compare --selection /absolute/selection \
   --required-file src/main.py
 ```
 
@@ -221,7 +235,7 @@ python3 "Codex Desktop/context.py" compare --selection /absolute/selection \
 課題に必要と分かっている適格ファイルは、繰り返し指定できる`--focus-file`で固定します。`--scope-max-calls`は候補全体の**計画上の**Jevリクエスト数の上限です（既定4回、範囲1〜24回）。後の`select --max-calls`による実行上限とは別です。未追跡ファイルは引き続き`--include-file`が必要です。`--focus-file`でも適格性や1ファイル100 KBの上限は迂回できません。
 
 ```sh
-python3 "Codex Desktop/context.py" plan --repo /absolute/repo \
+bin/astra-jev desktop plan --repo /absolute/repo \
   --task-file /absolute/task.txt --out /absolute/plan \
   --focus-file src/pagination.py --focus-file tests/test_pagination.py \
   --scope-max-calls 4

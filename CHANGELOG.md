@@ -1,5 +1,21 @@
 # Changelog / 変更履歴
 
+## v0.7.0 — 2026-09-29
+
+- Replace normal Harness execution and Skill installation with a compiled Go runtime: Desktop/Claude context workflows, evidence, optional output selection, saved-receipt comparison and CLI candidate generation/verify/apply. Python remains a source-only development oracle; platform archives do not contain Python entrypoints.
+- Preserve Python-compatible canonical Jev request hashes and cache validation, source/host freshness, bounded reads, secret/path guards, explicit call caps, attempt-before-request records, no redirects/retries and unknown-cost accounting. Add native Go package/module dependency closure; conservatively retain Python context on parser uncertainty.
+- Preserve configured Codex model/effort, isolated candidates, explicit new-file/test grants, unchanged verified-artifact checks and apply rollback. Add native regression coverage using fake Codex and local HTTP fixtures, with no live generation or recurring timing/A-B measurement.
+- Switch both installed Skills to `.sh` launchers that execute the existing binary. Build once or use the platform archive; no compilation or interpreter setup occurs during coding. Keep installer idempotence, foreign-Skill protection and user authentication intact.
+- Add independent macOS arm64/Linux amd64 build/test/archive jobs and bundled dependency license notices. Detail runtime requirements, migration limits and rollback in both READMEs. No new measured claim about coding tokens, total model cost or end-to-end speed.
+
+### 日本語
+
+- 通常のHarness・両Skill・installerをGo実行版へ移行。コンテキスト、資料、任意ログ選別、保存済み使用量比較、CLI候補生成／検証／適用を移植。Pythonはソースrepoの開発用に残し、配布archiveから除外します。
+- 互換JSON／request hash、cache検証、鮮度・host・path・秘密情報の保護、呼び出し上限、試行記録、retryなしの動作を維持。Go依存解析を追加し、Python解析の不確実性では保持します。
+- ユーザーのCodex設定、隔離候補、明示の変更許可、検証済みhash、apply復旧を維持。疑似CodexとローカルHTTPを使う回帰検証を追加し、実モデルの比較や常時計測は導入しません。
+- Skill入口をビルド済みバイナリへ切替。通常CodingでPython／Go／自動ビルドは不要。installerは別Skillや認証を上書きしません。
+- macOS arm64／Linux amd64の検証・配布archive、依存ライセンス、英日READMEを整備。Coding token・総費用・課題完了速度の改善率は未計測です。
+
 ## v0.6.0 — 2026-09-28
 
 - Add `present` to Desktop and Claude Code: bounded original-source pages with hashes, line numbers, unpresented ranges and continuation offsets. The entire JSON output has an explicit byte cap; retained full sources are unchanged. Valid Jev judgments, freshness and host checks remain required.

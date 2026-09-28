@@ -4,22 +4,22 @@
 
 [`claude-jev-coding`](skills/claude-jev-coding/SKILL.md) is a Claude Code Agent Skill. The current Claude Code session implements, reviews and tests the change with its own tools. Jev only judges file relevance. `Claude Code/context.py` is a thin adapter over the same host-neutral core as the Codex Desktop helper (`shared/host_context.py`). It never starts Codex, Astra or another coding agent.
 
-Requires Python 3.10+ and Git. No extra Python packages are needed.
+Requires the compiled `bin/astra-jev` executable and Git; Python is not a runtime dependency. No extra Python packages are needed.
 
 ## Install and check
 
 Run these commands from the root of the cloned harness repository.
 
 ```sh
-python3 install.py --target claude-code --check   # prints the action, writes nothing
-python3 install.py --target claude-code           # links ~/.claude/skills/claude-jev-coding
+bin/astra-jev install --target claude-code --check   # prints the action, writes nothing
+bin/astra-jev install --target claude-code           # links ~/.claude/skills/claude-jev-coding
 # Project scope: link into a project's own skills directory instead.
-python3 install.py --target claude-code --skills-dir "/absolute/project/.claude/skills"
+bin/astra-jev install --target claude-code --skills-dir "/absolute/project/.claude/skills"
 ```
 
-The installer creates one symlink to this clone. Running it again reports `already-installed`. It refuses to replace any existing file, directory or symlink with the same name, including broken links. It does not read or copy Claude Code or TypeSafe credentials, and it does not change settings, models or permissions. Keep the clone in place. To uninstall, remove only that symlink. `python3 install.py` without `--target` still installs the Codex Desktop Skill.
+The installer creates one symlink to this clone. Running it again reports `already-installed`. It refuses to replace any existing file, directory or symlink with the same name, including broken links. It does not read or copy Claude Code or TypeSafe credentials, and it does not change settings, models or permissions. Keep the clone in place. To uninstall, remove only that symlink. `bin/astra-jev install` without `--target` still installs the Codex Desktop Skill.
 
-To check the installation: `python3 ~/.claude/skills/claude-jev-coding/scripts/context.py doctor` prints `"surface": "claude-code"`, the linked checkout, and whether a key is available. It never prints the key and does not call a provider.
+To check the installation: `~/.claude/skills/claude-jev-coding/scripts/context.sh doctor` prints `"surface": "claude-code"`, the linked checkout, and whether a key is available. It never prints the key and does not call a provider.
 
 ## Invocation
 

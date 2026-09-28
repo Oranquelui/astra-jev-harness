@@ -2,17 +2,17 @@
 
 [`astra-jev-coding`](skills/astra-jev-coding/SKILL.md)はCodex Desktopで使うCodex Agent Skillです。現在の会話モデル（Astraを選択した場合はAstra）が実装・レビュー・検証を行い、Jevをコンテキスト選別に使います。`Codex Desktop/context.py`は選別用のローカルツールです。別のCodex CLIを起動してコード生成する方式は[Codex cli/](../Codex%20cli/README.md)へ分離しました。
 
-Python 3.10以降とGitを使用し、追加Pythonライブラリは不要です。下記はリポジトリルートから実行します。
+ビルド済みのGo実行ファイル`bin/astra-jev`とGitを使います。Harnessの実行にPythonは不要です。下記はリポジトリルートから実行します。
 
-長い進捗ログには、任意の[コマンド出力選別](../docs/TOOL-OUTPUT.md)も使えます。Skillの`scripts/output.py`から明示的に実行し、原文をGit外へ保存してJevで選別します。会話履歴の圧縮や全コマンドへの自動適用ではありません。
+長い進捗ログには、任意の[コマンド出力選別](../docs/TOOL-OUTPUT.md)も使えます。Skillの`scripts/output.sh`から明示的に実行し、原文をGit外へ保存してJevで選別します。会話履歴の圧縮や全コマンドへの自動適用ではありません。
 
 ```sh
-python3 "Codex Desktop/context.py" doctor
-python3 "Codex Desktop/context.py" plan --repo /absolute/target/repo \
+bin/astra-jev desktop doctor
+bin/astra-jev desktop plan --repo /absolute/target/repo \
   --task-file /absolute/task.txt --out /absolute/context-plan
-python3 "Codex Desktop/context.py" select --plan /absolute/context-plan \
+bin/astra-jev desktop select --plan /absolute/context-plan \
   --out /absolute/context-selection --max-calls 4
-python3 "Codex Desktop/context.py" check --selection /absolute/context-selection
+bin/astra-jev desktop check --selection /absolute/context-selection
 ```
 
 `plan`はAPIを呼ばず、対象を変更しません。`PLAN.md`に送信候補、除外理由、必要なリクエスト数を示します。対象はGit追跡中の現在のファイル内容です。既存の未コミット変更は含まれ、未追跡ファイルは既定では含まれません。確認したファイルを`--include-file`で明示指定できます。stageは不要です。
@@ -20,7 +20,7 @@ python3 "Codex Desktop/context.py" check --selection /absolute/context-selection
 適格ファイル全体が2,000,000バイト・1,500ファイル・予定呼出数のいずれかの上限を超えるrepoでは、`plan`が課題文とファイルの語の一致で候補をローカルに絞り、最大2,000,000バイトのplanにします。`--focus-file`は重要と分かっている適格ファイルを固定し、繰り返し指定できます。`--scope-max-calls`は候補全体の**予定**Jevリクエスト数を制限し、既定4回、指定範囲1〜24回です。すべての上限内なら全文候補を維持します。
 
 ```sh
-python3 "Codex Desktop/context.py" plan --repo /absolute/target/repo \
+bin/astra-jev desktop plan --repo /absolute/target/repo \
   --task-file /absolute/task.txt --out /absolute/context-plan \
   --focus-file src/pagination.py --focus-file tests/test_pagination.py \
   --scope-max-calls 4
@@ -36,11 +36,11 @@ python3 "Codex Desktop/context.py" plan --repo /absolute/target/repo \
 
 ## Skillと資格情報
 
-Skillの呼び出しは、開発用のJev選別を使う依頼として扱います。Skillの`scripts/context.py`は`select`・`check`・`read`へ`--require-jev`を付け、Jevを使わない選別経路や、Jev判定のない受け渡しを拒否します。通常は`--mode jev`で実行します。`local`と小さい入力の`auto`は、キー取得・API呼び出し・出力作成の前に拒否されます。有効な同一リクエストのキャッシュは利用できますが、再利用件数と実API呼び出し件数を分けて報告します。
+Skillの呼び出しは、開発用のJev選別を使う依頼として扱います。Skillの`scripts/context.sh`は`select`・`check`・`read`へ`--require-jev`を付け、Jevを使わない選別経路や、Jev判定のない受け渡しを拒否します。通常は`--mode jev`で実行します。`local`と小さい入力の`auto`は、キー取得・API呼び出し・出力作成の前に拒否されます。有効な同一リクエストのキャッシュは利用できますが、再利用件数と実API呼び出し件数を分けて報告します。
 
 製品の実行時に有料モデルを呼ばないという制約と、許可済みの開発ファイル選別は別の範囲です。ただし、すべての外部送信・有料呼び出しを禁じる指示は守ります。認証不足やAPI失敗を理由にlocalへ黙って切り替えたり、記録を確認せず再実行したりしません。この確認はSkillの入口に適用され、会話全体のツールを自動的に制御するものではありません。任意の`output.py`の動作は変わりません。
 
-`Codex Desktop/skills/astra-jev-coding`をユーザーのSkillディレクトリから参照します。インストール済みSkillの`python3 ~/.codex/skills/astra-jev-coding/scripts/context.py doctor`（`CODEX_HOME`を変更した場合は対応するパス）はsymlinkを解決して、このcheckoutの入口を使います。v0.3.0以前から更新した場合は`python3 install.py`を再実行すると、このcloneを指す旧リンクを移行します。checkoutを削除・移動する際は参照も更新してください。
+`Codex Desktop/skills/astra-jev-coding`をユーザーのSkillディレクトリから参照します。インストール済みSkillの`~/.codex/skills/astra-jev-coding/scripts/context.sh doctor`（`CODEX_HOME`を変更した場合は対応するパス）はsymlinkを解決して、このcheckoutの入口を使います。v0.3.0以前から更新した場合は`bin/astra-jev install`を再実行すると、このcloneを指す旧リンクを移行します。checkoutを削除・移動する際は参照も更新してください。
 
 `TYPESAFE_API_KEY`を優先し、未設定のmacOS環境ではlogin Keychainのservice `astra-jev-harness` / account `TYPESAFE_API_KEY`から取得します。キー値を出力せず、helperプロセス内だけで使います。`doctor`は外部APIを呼びません。plan/check/ヘルプはKeychainを読みません。
 
@@ -60,14 +60,14 @@ Skillの呼び出しは、開発用のJev選別を使う依頼として扱いま
 
 ```sh
 # 同じ保存済み確率で比較。API・Keychainへのアクセスも書き込みも行いません。
-python3 "Codex Desktop/context.py" compare --selection /absolute/context-selection
+bin/astra-jev desktop compare --selection /absolute/context-selection
 
 # 課題の必要ファイルを独立に特定済みなら、取りこぼしも比較できます。
-python3 "Codex Desktop/context.py" compare --selection /absolute/context-selection \
+bin/astra-jev desktop compare --selection /absolute/context-selection \
   --required-file src/main.py --required-file tests/test_main.py
 
 # 比較で省略内容を確認してから、新規selectで明示的に採用します。
-python3 "Codex Desktop/context.py" select --plan /absolute/context-plan \
+bin/astra-jev desktop select --plan /absolute/context-plan \
   --out /absolute/new-selection --max-calls 4 --policy per-file
 ```
 

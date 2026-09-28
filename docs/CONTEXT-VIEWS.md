@@ -7,7 +7,7 @@ Implemented for Desktop and Claude Code helpers. These local views add no API ca
 After `plan → select --mode jev → check`, request a bounded first page:
 
 ```sh
-python3 "Codex Desktop/skills/astra-jev-coding/scripts/context.py" present \
+"Codex Desktop/skills/astra-jev-coding/scripts/context.sh" present \
   --selection /absolute/selection --max-bytes 8192 --lines-per-file 12
 ```
 
@@ -20,8 +20,8 @@ The **entire serialized JSON response including its final newline** fits `--max-
 A plan can omit eligible files before any Jev judgment. Browse those files locally:
 
 ```sh
-python3 "Codex Desktop/skills/astra-jev-coding/scripts/context.py" discover --plan /absolute/plan
-python3 "Codex Desktop/skills/astra-jev-coding/scripts/context.py" discover \
+"Codex Desktop/skills/astra-jev-coding/scripts/context.sh" discover --plan /absolute/plan
+"Codex Desktop/skills/astra-jev-coding/scripts/context.sh" discover \
   --plan /absolute/plan --directory src/another-component --max-bytes 8192
 ```
 
