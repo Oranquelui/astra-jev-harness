@@ -1,0 +1,52 @@
+Generator: built-in image_gen (English localization).
+Input: the Japanese concept illustration represented by astra-jev-concept-ja.webp.
+The generated PNG was converted to lossless WebP for README delivery.
+
+Use case: text-localization.
+Input image: the attached Japanese Astra + Jev editorial concept page is the edit target.
+Create its English-language counterpart for the project's English README. Keep the same portrait dimensions, generous margins, original cream paper, detailed scientific illustrations, teal Jev gate, cobalt Astra code panel, amber file arrows, enormous black serif Astra + Jev title, numbered three-stage diagram, two-column lower editorial sections, thin rules and bottom three-color priority words. Keep all file names and illustrative code unchanged. Preserve all arrows and semantic relationships. Localize every Japanese inscription into natural, crisp, perfectly spelled English; leave no Japanese text. Reflow translated typography as needed to fit without clipping or sacrificing readability. Do not redesign the page or remove content. Preserve the "v0.7.0" label, which identifies the Go architecture milestone rather than the current package patch version.
+
+Render these exact English strings in the corresponding locations:
+Masthead unchanged: "AI ENGINEERING / CONCEPT NOTES"
+Main title unchanged: "Astra + Jev"
+Main deck: "Better context. Focused implementation."
+Main subtitle: "Jev selects relevant code. Astra designs, implements and tests."
+Small upper-right Japanese paragraph becomes: "Better context builds better software. The right information, in the right form, for the next step."
+Preserve the small existing English phrase "BUILD WITH THE RIGHT CONTEXT FOR A BRIGHTER TOMORROW."
+
+Amber task slip: "Task: fix a caching bug"
+01 Harness: "Prepare candidates"
+Repository folder label: "Repository"
+Caption below repository illustration: "Prepare candidate files from the repository."
+02 Jev: "Assess relevance"
+Upper blue-file label: "Relevant files"
+Amber-file safeguard label: "Keep uncertain context and dependencies"
+Caption below Jev: "Assess relevance from file content and context."
+03 Astra: "Implement & verify"
+White checklist title: "Run tests"
+Checklist entries: "Build", "Unit tests", "Verify changes"
+Output document label: "Implemented fix"
+Caption below Astra: "Read original sources, implement changes, and test."
+
+Foundation band: "Go Harness: preserve source text, line numbers and freshness"
+Preserve small supporting English foundation lettering "CODE CONTEXT INTEGRITY" and "SAME CONTEXT. BRIGHTER SOFTWARE."
+Caption below foundation: "In Codex Desktop, the active conversation model continues the implementation."
+
+Lower left column:
+"I. Separate selection and implementation"
+"Jev judges file relevance. Astra reads the original sources it needs, implements the change, and runs tests."
+"II. Preserve correctness"
+"Retain uncertain context and dependencies. Preserve source text and line numbers, and check freshness before editing."
+
+Lower right column:
+"III. Reuse identical judgments"
+"Reuse cached judgments for identical requests. Read the needed source ranges in stages."
+"IV. A native Go runtime"
+"Normal Harness use requires no Python. Use the prebuilt binary, without rebuilding or running comparisons on every task."
+
+Large bottom words: "Accuracy" in vermilion, "Cost" in amber, "Speed" in teal.
+Bottom tagline: "Preserve correctness. Reduce unnecessary work."
+Fine-print footer: "Concept diagram — not a measurement of total cost or speed gains."
+Bottom right credit unchanged: "ASTRA + JEV HARNESS".
+
+Accuracy invariants: Jev selects context, not code generation or test execution. Uncertain context and dependencies stay available. The active Desktop model implements; do not add a separate agent. No prices, savings percentages, measured speed claims or request counters. Preserve the illustrations, layout hierarchy, palette, original version marker and technical meaning. Only translate typography and adapt line wrapping. Deliver one polished high-resolution English page with excellent typographic legibility, opaque background.

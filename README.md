@@ -6,6 +6,10 @@ This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20De
 
 Narrow large repositories locally, let **Jev judge the bounded candidates**, then let **your coding model write the code**.
 
+![Astra + Jev architecture: the Harness prepares candidate files, Jev assesses relevance while retaining uncertain context and dependencies, and Astra implements and tests the change.](docs/assets/astra-jev-concept-en.webp)
+
+*The Go architecture introduced in v0.7.0 also applies to v0.7.1. This concept illustration shows the Codex Desktop workflow; it is not a cost or speed benchmark.*
+
 A local coding harness for Codex CLI, Codex Desktop and Claude Code. Give it a task such as “fix pagination without changing the public API”; it snapshots eligible files, locally narrows oversized repositories, asks Jev which candidates the coding model needs, preserves dependencies, and records what was kept and why.
 
 **Goal:** reduce Astra token consumption and combined inference cost while preserving coding correctness and avoiding extra turnaround time. File selection is a means to that goal. The Claude Code Skill extends the same goal to Claude; its savings are not yet measured.
