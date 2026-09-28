@@ -110,6 +110,8 @@ P1-Bの結果記録とP2の共有予算は永続化・実行方式の設計を�
 2. 利用者の再開指示の範囲でP1-Aから実装する。`astra-jev-coding`の新しいplan/select/checkを作り、過去の選別を現在の編集許可として使わない。
 3. P1-A完了後、その結果を確認してP1-B／P2の未決定事項を具体化する。push・merge・releaseは今回の承認から推定しない。
 
+未知の必要ファイルを探す段階的探索、保持と提示の分離、部分結果の扱いは[jevgrepを参考にした追加計画](JEVGREP-ADOPTION-PLAN.md)に記録した。P1-AとP3を計測基盤として使い、両計画の費用・品質評価を一つの比較にまとめる。
+
 ## 参考資料
 
 - [Keelの判断記録とreport](https://github.com/codejunkie99/keel/blob/5cef4569e7f850b3a85dc998cc64c64e944c80a0/crates/engine/src/decision_log.rs)
