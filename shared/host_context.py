@@ -280,6 +280,53 @@ def compare(host, selection_dir, required_paths=None):
             'additional_omitted_bytes': compared['batch']['selected_bytes'] - compared['per-file']['selected_bytes']}
 
 
+def present(host, selection_dir, max_bytes=8192, offset=0, lines_per_file=12, require_jev=True):
+    """Separate retained context from the first bounded source view."""
+    from shared.context_view import presentation
+    host.check(selection_dir, require_jev=require_jev)
+    directory = Path(selection_dir).resolve()
+    record = load_surface_record(directory, host, ('selected',))
+    plan = host.load_host_plan(record['plan_dir'])
+    context = json.loads((directory / 'context.json').read_text())
+    result = presentation(plan, record, context, max_bytes, offset, lines_per_file)
+    host.check(selection_dir, require_jev=require_jev)
+    return result
+
+
+def discover(host, plan_dir, directory=None, max_bytes=8192, offset=0, lines_per_file=4):
+    """Browse eligible scoped-out branches before explicitly planning more Jev work."""
+    from shared.context_view import bounds, excerpt, page
+    bounds(max_bytes, offset, lines_per_file)
+    plan = host.load_host_plan(plan_dir)
+    host.fresh(plan)
+    omitted = plan.get('scoped_out', {})
+    branches = {}
+    for path in omitted:
+        branches.setdefault(str(Path(path).parent), []).append(path)
+    base = {'status': 'discovery', 'judgment': 'unjudged', 'scoped_out_files': len(omitted),
+            'next_step': 'Review branches, then make a new plan with existing focus plus discovered --focus-file; select/check before edits.'}
+    if directory is None:
+        candidates = [lambda d=d: {'directory': d, 'files': len(branches[d]),
+                                   'source_bytes': sum(omitted[p]['bytes'] for p in branches[d])}
+                      for d in sorted(branches)]
+    else:
+        if directory not in branches:
+            raise ProtocolError('Choose an exact directory from the discovery index')
+        def preview(path):
+            raw = rc.safe_path(Path(plan['repo']), path).read_bytes()
+            if rc.digest(raw) != omitted[path]['sha256']:
+                raise ProtocolError('Discovery source changed')
+            text = raw.decode('utf-8')
+            if '\0' in text or rc.SECRET.search(text):
+                raise ProtocolError('Discovery source is not eligible')
+            return excerpt(path, text, 1, lines_per_file, judgment='unjudged')
+        candidates = [lambda p=p: preview(p) for p in sorted(branches[directory])]
+        base['directory'] = directory
+    result = page(base, candidates, offset, max_bytes)
+    host.fresh(plan)
+    return result
+
+
 def main(host, description=None, argv=None):
     parser = argparse.ArgumentParser(description=description)
     sub = parser.add_subparsers(dest='command', required=True)
@@ -314,6 +361,18 @@ def main(host, description=None, argv=None):
     p = sub.add_parser('compare', help='Replay saved judgments without API calls or source writes')
     p.add_argument('--selection', required=True)
     p.add_argument('--required-file', action='append', default=[])
+    p = sub.add_parser('present', help='Present bounded original source; retention stays unchanged')
+    p.add_argument('--selection', required=True)
+    p.add_argument('--max-bytes', type=int, default=8192)
+    p.add_argument('--offset', type=int, default=0)
+    p.add_argument('--lines-per-file', type=int, default=12)
+    p.add_argument('--require-jev', action='store_true', default=True)
+    p = sub.add_parser('discover', help='Browse unjudged scoped-out branches and source previews')
+    p.add_argument('--plan', required=True)
+    p.add_argument('--directory')
+    p.add_argument('--max-bytes', type=int, default=8192)
+    p.add_argument('--offset', type=int, default=0)
+    p.add_argument('--lines-per-file', type=int, default=4)
     args = parser.parse_args(argv)
     try:
         if args.command == 'doctor':
@@ -336,9 +395,14 @@ def main(host, description=None, argv=None):
                                        require_jev=args.require_jev)
         elif args.command == 'compare':
             result = host.compare(args.selection, args.required_file)
+        elif args.command == 'present':
+            result = present(host, args.selection, args.max_bytes, args.offset, args.lines_per_file,
+                             require_jev=args.require_jev)
+        elif args.command == 'discover':
+            result = discover(host, args.plan, args.directory, args.max_bytes, args.offset, args.lines_per_file)
         else:
             result = host.check(args.selection, require_jev=args.require_jev)
-        print(json.dumps(result))
+        print(json.dumps(result, ensure_ascii=args.command not in ('present', 'discover')))
         return 0
     except JevRequiredError:
         print(JEV_REQUIRED_MESSAGE, file=sys.stderr)

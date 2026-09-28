@@ -106,3 +106,9 @@ One live Jev 1.13.0 request on fictional code-debugging evidence succeeded: 971 
 Two live Jev 1.13.0 requests judged all four ranges in a synthetic two-file repository, including a 27,278-byte unrelated file that exceeded the old batch allowance. The required 75-byte implementation file was retained; the unrelated file was omitted. Recorded usage was 6,784 input / 76 output tokens, with 2.70 seconds for selection. Repeating the identical selection made zero additional provider calls. No real project was modified and no Astra child generation ran. This checks coverage, response handling and reuse; it does not measure Astra token savings or coding accuracy on real tasks.
 
 合成repoの実Jev検証は2回・全4範囲の判定に成功しました。旧22 KBを超えるファイルも判定され、必要ファイルを保持しました。使用量は入力6,784 / 出力76 token、同一入力の再利用は追加呼び出し0回です。実作業でのAstra節約率・品質の評価は別途必要です。
+
+## Output receipt accounting (P1-A)
+
+`measure.py` also reads version-1 `kind: "tool-output"` reports: `calls`, `attempted_calls`, status and seconds. `record_kinds` distinguishes CLI, Desktop, Claude Code, evidence, tool-output and unknown receipts. An unrecognized JSON `calls` field is not treated as provider usage. Recognized auxiliary receipts can supplement CLI usage; alone they cannot establish usage of a wrapped command or a host conversation. Missing attempts/usage/cache fields remain unknown. A failed attempt with no response stays potentially billable. Duplicate artifact paths count once; distinct live calls sharing a request hash count separately; historical cache usage is not new spend. Reading receipts makes no provider calls or writes to source receipts.
+
+P1-Aでtool-outputの既存reportを統合集計できるようになりました。補助処理のみの記録から会話全体やラップしたcommandの費用は確定しません。未知形式、失敗、欠測、cache再利用を区別し、元記録は変更しません。

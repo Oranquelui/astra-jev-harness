@@ -228,6 +228,92 @@ class EvidenceTests(unittest.TestCase):
 
 
 class UsageTests(unittest.TestCase):
+    def summarize_records(self, records, prices=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = []
+            for n, record in enumerate(records):
+                path = Path(tmp) / str(n)
+                path.write_text(json.dumps(record))
+                paths.append(path)
+            before = [p.read_bytes() for p in paths]
+            result = measure.summarize(paths + paths[:1], prices)
+            self.assertEqual(before, [p.read_bytes() for p in paths])
+            return result
+
+    def test_tool_output_usage_with_cli_and_multiple_model_prices(self):
+        cli = {'astra_calls': [{'model': 'astra-test', 'usage': {
+            'input_tokens': 100, 'output_tokens': 10, 'cached_input_tokens': 20,
+            'cache_write_input_tokens': 10}}], 'attempted_astra_calls': 1,
+            'attempted_jev_calls': 0, 'seconds': 2, 'status': 'verified'}
+        call = {'model': 'jev-test', 'request_sha256': 'same-request',
+                'usage': {'input_tokens': 50, 'output_tokens': 5}}
+        aux = {'kind': 'tool-output', 'version': 1, 'calls': [call, call,
+               {'reused': True, 'usage': call['usage']}], 'attempted_calls': 2,
+               'seconds': .5, 'status': 'selected'}
+        prices = {'astra-test': {'input': 1, 'output': 2, 'cache_read': .5, 'cache_write': 2},
+                  'jev-test': {'input': 3, 'output': 4}}
+        r = self.summarize_records([cli, aux], prices)
+        self.assertEqual(r['record_count'], 2)
+        self.assertEqual(r['record_kinds'], ['cli', 'tool-output'])
+        self.assertEqual(r['jev']['known_input_tokens'], 100)
+        self.assertEqual(r['jev']['reused_calls'], 1)
+        self.assertEqual(r['summed_run_seconds'], 2.5)
+        self.assertEqual(r['dollar_cost'], '0.00046')
+        self.assertIsNone(self.summarize_records([aux], prices)['dollar_cost'])
+
+    def test_tool_output_failure_and_missing_usage_remain_partial(self):
+        for calls, attempts, expected_unknown in [
+            ([{'usage': {'input_tokens': 12, 'output_tokens': 1}}], 2, 1),
+            ([{'usage': None}], 1, 1), ([], 1, 1), ([], None, None),
+        ]:
+            with self.subTest(calls=calls, attempts=attempts):
+                r = self.summarize_records([{'kind': 'tool-output', 'version': 1,
+                    'status': 'unchanged', 'reason': 'provider_failure',
+                    'calls': calls, 'attempted_calls': attempts}])
+                self.assertEqual(r['jev']['unknown_usage_calls'], expected_unknown)
+                self.assertFalse(r['jev']['complete_usage'])
+                self.assertIsNone(r['summed_run_seconds'])
+
+    def test_unknown_schema_never_adopts_arbitrary_calls(self):
+        for extra in [{}, {'kind': 'other'}, {'kind': 'tool-output', 'version': 2}]:
+            r = self.summarize_records([dict(calls=[{'usage': {
+                'input_tokens': 500, 'output_tokens': 5}}], attempted_calls=0, **extra)])
+            self.assertEqual(r['record_kinds'], ['unknown'])
+            self.assertEqual(r['jev']['known_input_tokens'], 0)
+            self.assertFalse(r['jev']['complete_usage'])
+
+    def test_unknown_schema_never_contributes_run_seconds(self):
+        cli = {'astra_calls': [], 'attempted_astra_calls': 0,
+               'attempted_jev_calls': 0, 'seconds': 2}
+        for extra in [{}, {'kind': 'other'}, {'kind': 'tool-output', 'version': 2}]:
+            with self.subTest(schema=extra):
+                unknown = dict(seconds=99, **extra)
+                self.assertIsNone(self.summarize_records([unknown])['summed_run_seconds'])
+                self.assertIsNone(self.summarize_records([cli, unknown])['summed_run_seconds'])
+        self.assertEqual(self.summarize_records([cli])['summed_run_seconds'], 2)
+
+    def test_no_call_output_and_host_usage_are_distinct(self):
+        aux = {'kind': 'tool-output', 'version': 1, 'calls': [], 'attempted_calls': 0}
+        r = self.summarize_records([aux])
+        self.assertTrue(r['jev']['complete_usage'])
+        self.assertFalse(r['astra']['complete_usage'])
+        cli = {'astra_calls': [], 'attempted_astra_calls': 0, 'attempted_jev_calls': 0}
+        self.assertTrue(self.summarize_records([cli, aux])['astra']['complete_usage'])
+        desktop = {'surface': 'desktop', 'jev_calls': [], 'attempted_calls': 0}
+        self.assertFalse(self.summarize_records([cli, desktop])['astra']['complete_usage'])
+
+    def test_bad_attempt_counts_and_missing_cache_prevent_complete_cost(self):
+        for attempts in [-1, True, '1']:
+            r = self.summarize_records([{'kind': 'tool-output', 'version': 1,
+                'calls': [], 'attempted_calls': attempts}])
+            self.assertFalse(r['jev']['complete_usage'])
+        cli = {'astra_calls': [{'model': 'a', 'usage': {'input_tokens': 1, 'output_tokens': 1}}],
+               'attempted_astra_calls': 1, 'attempted_jev_calls': 0}
+        r = self.summarize_records([cli], {'a': {'input': 1, 'output': 1}})
+        self.assertTrue(r['astra']['complete_usage'])
+        self.assertFalse(r['astra']['complete_cache_usage'])
+        self.assertIsNone(r['dollar_cost'])
+
     def test_unknown_failed_calls_not_zero_and_cache_not_double_charged(self):
         calls=[{'usage':{'input_tokens':100,'output_tokens':10}}, {'reused':True,'usage':None}]
         r=measure.provider(calls,2)

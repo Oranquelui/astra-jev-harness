@@ -1,5 +1,21 @@
 # Changelog / 変更履歴
 
+## v0.6.0 — 2026-09-28
+
+- Add `present` to Desktop and Claude Code: bounded original-source pages with hashes, line numbers, unpresented ranges and continuation offsets. The entire JSON output has an explicit byte cap; retained full sources are unchanged. Valid Jev judgments, freshness and host checks remain required.
+- Add operator-guided `discover`: browse every scoped-out directory/file page, inspect short original previews, then create a fresh plan preserving focus/includes before Jev selection. Unjudged files remain distinct from irrelevant files. No automatic provider calls, retries or new selection defaults.
+- Fix `measure.py` to normalize recognized version-1 tool-output `calls` alongside CLI, host and evidence receipts. Preserve known subtotals, unknown attempts/usage/cache details, separate live requests and reused judgments, and duplicate-path suppression. Unknown receipt schemas cannot contribute run duration. Auxiliary receipts do not establish complete conversation costs.
+- Expand English/Japanese README with before/after behavior, commands, compatibility, measured presentation bytes and explicit unmeasured outcomes. Python 3.10+ remains required; bundled Python is a proposal only.
+- Validation: 199 offline tests passed. Implementation context selection: 12 live attempts/completions, 0 cache reuses, 83,571 input / 813 output tokens, all 37 candidate files retained. Historical presentation replay kept 267,517 source bytes and returned 5,750 JSON bytes on the first page (3,459 source bytes); replay made no API calls. No new Astra-token, total-cost or coding-quality improvement is established.
+
+### 日本語
+
+- Desktop／Claude Codeに`present`を追加。保持済み全文を変えず、原文・hash・行番号・未提示範囲・次ページをJSON応答全体の上限内で返します。Jev判定・鮮度・host一致を確認します。
+- `discover`で候補外のディレクトリと短い原文を段階的に確認できます。ページを辿って複数の枝を残し、既存focus/includeを維持した新しいplanとJev選別へ戻ります。未判定を無関係とみなさず、自動API・retry・既定policy変更は行いません。
+- `measure.py`がtool-output v1の`calls`を統合集計します。既知の部分集計、試行・usage・cacheの欠測、実呼び出しと再利用、重複pathを区別し、補助記録だけで会話全体の費用を確定しません。
+- 英日READMEに改善前後、使い方、互換性、表示bytes実測と限界を追記。Python 3.10以上は必要で、同梱配布は提案段階です。
+- 検証199件成功。実装時Jevは12回試行／完了・再利用0回、入力83,571／出力813 tokenで37候補を全保持。保存済み選別の原文267,517 bytesを保持し、初回提示はJSON5,750 bytes（原文3,459 bytes）。再生の追加APIは0回で、Astra token・総費用・coding品質の改善実測ではありません。
+
 ## v0.5.1 — 2026-09-27
 
 - Require valid Jev judgments through the Codex Desktop Skill's `select`, `check`, and `read` entrypoints. Reject local/auto bypasses before credentials or transmission, preserve matching cached judgments, and distinguish reuse from new API calls. Direct native-helper baselines remain available for explicit no-Jev requests; no silent fallback or automatic retry. Optional output selection and Claude Code behavior are unchanged. This fix makes no new token or cost-saving claim.
