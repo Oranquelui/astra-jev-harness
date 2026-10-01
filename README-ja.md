@@ -1,6 +1,6 @@
 # Astra + Jev：Codex・Claude Code向けエージェントスキル
 
-[English](README.md) · [バージョン 0.7.1](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
+[English](README.md) · [バージョン 0.7.2](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
 
 このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](Codex%20Desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。別途、**Claude Code用の[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md)**を追加し、同じコンテキスト選別を現在のClaude Codeセッションで使えるようにしました。
 
@@ -8,13 +8,29 @@
 
 ![Astra + Jevの構成：Harnessが候補ファイルを整理し、Jevが不確実な情報・依存関係を保持しながら関連性を判断し、Astraが実装・検証する。](docs/assets/astra-jev-concept-ja.webp)
 
-*v0.7.0で導入したGo実行版の構成は、v0.7.1でも共通です。Codex Desktopでの役割分担を示す概念図で、費用・速度の実測結果ではありません。*
+*v0.7.0で導入したGo実行版の構成は、v0.7.2でも共通です。Codex Desktopでの役割分担を示す概念図で、費用・速度の実測結果ではありません。*
 
 Codex CLI・Codex Desktop・Claude Code向けのローカルCoding Harnessです。「公開APIを変えずにページングを修正して」といった課題から、対象ファイルをスナップショット化し、大きなrepoでは候補をローカルで絞ってからJevが関連性を判断します。依存ファイルを補い、何を残したか、その理由も記録します。
 
 **目的：** コードの正しさを保ちながら、Astraの消費tokenと推論全体の費用を減らし、完成までの時間・手戻りも抑えることです。ファイル選別はそのための手段です。Claude Code版も同じ目的をClaudeに広げますが、その削減効果は未測定です。
 
 **実験段階です。** 過去の**v0.3.0**で、**Astra Extra High（`xhigh`）**で合成CLI課題を修正・テストまで比較すると、**Astra入力27.0%減、Jev込みのStandard API単価換算27.2%減**でした。両方式とも同じ6件の確認に成功。所要時間はこの比較では7.3%減でしたが、別の`medium`比較では34.6%増でした。各方式1試行であり、一般的な高速化やDesktopでの効果は示しません。[測定条件と結果](docs/BENCHMARKS.md)。
+
+## v0.7.2：Jevが使えない場合も許可済みの作業を継続
+
+従来のSkillには、ローカルの実装が許可されていても、Jevのplan作成や認証の失敗で再planへ戻る指示が残っていました。Desktop・Claude Codeともに「Jev未検証」と理由を明示し、既存の範囲内で調査・実装・テストを続けるよう修正しました。ユーザーが選んだJevなしの方針は、同じ課題の継続作業にも引き継ぎ、許可を聞き直しません。Jevの成功自体が明示的な完了条件の場合、その項目は未完了として残します。
+
+| 状況 | 更新後の進め方 |
+|---|---|
+| 必須依存がplanの予算に収まらない | 必要ファイルを残し、通常ツールで範囲読み取りします。課題を黙って狭めたり、上限を繰り返し増やしたりしません。 |
+| 認証情報が使えない／Jevが失敗した | 該当処理を止めて失敗記録を保持し、許可済み作業を続けます。自動再試行や認証リセットは行いません。 |
+| 新鮮で十分なplanがある | Desktopはhelper直接、Claudeはインストール済みwrapperでlocalのselect/check/readを使います。結果は未判定のままで、presentにはJev判定が必要です。 |
+| JevなしのCLI生成が既に許可されている | 十分なCLI用planと新しい出力先でrun --mode astraを使います。Codexは呼び出すためオフラインではなく、verify/applyの条件も維持します。 |
+| 通常の進捗・完了報告 | ClaudeもDesktopと同様、使用量の報告を依頼時だけに変更。変更・検証・対処が必要な問題に絞り、集計用の追加呼び出しやベンチマークを行いません。 |
+
+今回はSkill・ガイド・配布内容の修正で、選別・生成の実行コードは変更していません。鮮度・host・秘密情報・パス・呼び出し上限の保護は維持します。配布物には更新済みSkills、英日ガイド、WebP概念図、日本語CLI README、セキュリティ方針を含めます。Coding精度・token・費用・速度について、新たな改善率を実測したという主張はありません。
+
+cloneから利用している場合はrelease commitへfast-forwardし、checksumを確認した対応OSの実行ファイルで`bin/astra-jev`を更新するか、そのcommitから一度ビルドします。既存のSkill参照リンクは更新後の内容を読み込みます。archiveから導入する場合は恒久的なディレクトリへ展開してください。旧ディレクトリから移す場合は、Skillリンクが旧版を指すことを確認して、そのリンクだけを差し替えます。installerは別のSkillを上書きせず、再導入でも認証情報・モデル設定を変更しません。[導入の詳細](docs/GO-MIGRATION.md) · [Desktop継続手順](Codex%20Desktop/skills/astra-jev-coding/references/local-continuation.md) · [Claude継続手順](Claude%20Code/skills/claude-jev-coding/references/workflow.md#local-continuation) · [CLI継続手順](Codex%20cli/README.md#jevを使わずに継続する場合)。
 
 ## v0.7.1：Jev使用量の定型報告を削除
 

@@ -1,6 +1,6 @@
 # Astra + Jev: Codex and Claude Code Agent Skills
 
-[日本語](README-ja.md) · [Version 0.7.1](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
+[日本語](README-ja.md) · [Version 0.7.2](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
 
 This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20Desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately. A separate **[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md) for Claude Code** applies the same context selection to the current Claude Code session.
 
@@ -8,13 +8,29 @@ Narrow large repositories locally, let **Jev judge the bounded candidates**, the
 
 ![Astra + Jev architecture: the Harness prepares candidate files, Jev assesses relevance while retaining uncertain context and dependencies, and Astra implements and tests the change.](docs/assets/astra-jev-concept-en.webp)
 
-*The Go architecture introduced in v0.7.0 also applies to v0.7.1. This concept illustration shows the Codex Desktop workflow; it is not a cost or speed benchmark.*
+*The Go architecture introduced in v0.7.0 also applies to v0.7.2. This concept illustration shows the Codex Desktop workflow; it is not a cost or speed benchmark.*
 
 A local coding harness for Codex CLI, Codex Desktop and Claude Code. Give it a task such as “fix pagination without changing the public API”; it snapshots eligible files, locally narrows oversized repositories, asks Jev which candidates the coding model needs, preserves dependencies, and records what was kept and why.
 
 **Goal:** reduce Astra token consumption and combined inference cost while preserving coding correctness and avoiding extra turnaround time. File selection is a means to that goal. The Claude Code Skill extends the same goal to Claude; its savings are not yet measured.
 
 **Experimental.** In a historical **v0.3.0** comparison, one synthetic CLI coding task at **Astra Extra High (`xhigh`)** used **27.0% fewer Astra input tokens** and **27.2% less at equivalent Standard API rates**, including Jev. Both modes passed the same six checks. Elapsed time was 7.3% shorter in this pair, but 34.6% longer in a separate `medium` pair. Each is one trial per mode, not a general speedup or Desktop result. [Measurements and limits](docs/BENCHMARKS.md).
+
+## v0.7.2: continue authorized work when Jev is unavailable
+
+Jev planning or authentication failures previously led the Skills back to planning even when local implementation was already authorized. Desktop and Claude Code now state that Jev selection is unverified and continue investigation, implementation and tests within the existing scope. A user-selected no-Jev workflow persists across in-scope follow-ups without repeated approval. When a successful Jev judgment is itself an acceptance requirement, that requirement remains incomplete.
+
+| Situation | Updated workflow |
+|---|---|
+| Required dependencies exceed the planning budget | Keep the required files and use bounded native reads. Do not shrink the task silently or repeatedly increase request caps. |
+| Credentials are unavailable or a Jev request fails | Stop the affected operation, preserve failure receipts, and continue authorized work without automatic retries or authentication resets. |
+| A fresh plan covers the task | Desktop uses the direct helper's local select/check/read; Claude uses its installed wrapper. Local results remain unjudged, and `present` still requires Jev. |
+| CLI generation is already authorized without Jev | Use `run --mode astra` with a sufficient CLI plan and a new run directory. It still calls Codex; it is not offline and does not bypass verify/apply. |
+| Routine progress and completion replies | Claude now follows Desktop's request-only usage reporting. Report changes, verification and actionable blockers without extra accounting calls or benchmarks. |
+
+This release changes Skills, guides and packaging; the selection and generation runtime behavior is unchanged. Existing freshness, host, secret/path and request-limit checks remain enforced. The archives include the updated Skills, English/Japanese guides, WebP concept illustrations, Japanese CLI README and security policy. No new coding-quality, token, cost or speed improvement is claimed as measured.
+
+To update an installed clone, fast-forward it to the release commit and replace `bin/astra-jev` with the checksum-verified executable for your platform, or build once from that commit. Existing Skill symlinks then read the updated files. For an archive installation, extract into a permanent directory. If moving from an older directory, verify your Skill link points to that old installation before replacing only that link; the installer intentionally refuses to overwrite another Skill. Reinstalling does not copy credentials or change models. [Native installation](docs/GO-MIGRATION.md) · [Desktop continuation](Codex%20Desktop/skills/astra-jev-coding/references/local-continuation.md) · [Claude continuation](Claude%20Code/skills/claude-jev-coding/references/workflow.md#local-continuation) · [CLI continuation](docs/CLI.md#continuing-without-jev).
 
 ## v0.7.1: remove routine Jev usage reporting
 
