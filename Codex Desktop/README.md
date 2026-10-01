@@ -1,6 +1,6 @@
 # Codex Desktop用Agent Skill
 
-[`astra-jev-coding`](skills/astra-jev-coding/SKILL.md)はCodex Desktopで使うCodex Agent Skillです。現在の会話モデル（Astraを選択した場合はAstra）が実装・レビュー・検証を行い、Jevをコンテキスト選別に使います。`Codex Desktop/context.py`は選別用のローカルツールです。別のCodex CLIを起動してコード生成する方式は[Codex cli/](../Codex%20cli/README.md)へ分離しました。
+[`astra-jev-coding`](skills/astra-jev-coding/SKILL.md)はCodex Desktopで使うCodex Agent Skillです。現在の会話モデル（Astraを選択した場合はAstra）が実装・レビュー・検証を行い、Jevをコンテキスト選別に使います。`bin/astra-jev desktop`は選別用のローカルツールです。別のCodex CLIを起動してコード生成する方式は[Codex cli/](../Codex%20cli/README.md)へ分離しました。
 
 ビルド済みのGo実行ファイル`bin/astra-jev`とGitを使います。Harnessの実行にPythonは不要です。下記はリポジトリルートから実行します。
 
@@ -26,7 +26,7 @@ bin/astra-jev desktop plan --repo /absolute/target/repo \
   --scope-max-calls 4
 ```
 
-`PLAN.md`には元の適格ファイル数/バイト数、絞り込み対象外のパス/バイト数、予定呼び出し数を記録します。`plan.json`の`scope`が集計、`scoped_out`が対象外の適格ファイルです。これらは保護規則で除いた`excluded`や、Jevが無関係と判定したファイルとは別です。AGENTS.md、主要設定、解決できる依存は候補に残します。語の一致は翻訳しないため、ASCIIのパスや識別子を含まない日本語だけの課題では`--focus-file`が必要になる場合があります。課題とファイルの一致がなく必須パスの明示もないとき、または固定ファイル・必須情報が上限を超えるときはplanが停止するため、課題または`--focus-file`を具体化して作り直してください。固定指定は適格性や100 KBの単一ファイル上限を迂回しません。未追跡ファイルは別途`--include-file`で明示します。
+`PLAN.md`には元の適格ファイル数/バイト数、絞り込み対象外のパス/バイト数、予定呼び出し数を記録します。`plan.json`の`scope`が集計、`scoped_out`が対象外の適格ファイルです。これらは保護規則で除いた`excluded`や、Jevが無関係と判定したファイルとは別です。AGENTS.md、主要設定、解決できる依存は候補に残します。語の一致は翻訳しないため、ASCIIのパスや識別子を含まない日本語だけの課題では`--focus-file`が必要になる場合があります。課題との一致がなければ課題や既知のfocusを具体化します。必須依存が上限を超えてplanが停止した場合は、下記のローカル継続へ進みます。成功させるために必要なfocusや依存を落としたり、上限を繰り返し引き上げたりしません。固定指定は適格性や100 KBの単一ファイル上限を迂回しません。未追跡ファイルは別途`--include-file`で明示します。
 
 `select`だけがJevを呼びます。実行上限`--max-calls`は既定4回、指定可能範囲1〜24回で、plan時の`--scope-max-calls`とは別です。必要な回数が上限を超える場合は送信前に拒否します。各呼び出しの直前・完了後に`selection.json`を更新し、自動再試行はしません。失敗時も完了分の応答・使用量と試行回数が残ります。応答を受け取れなかった試行も課金された可能性があり、再実行前に記録を確認します。同じ出力ディレクトリへの再実行は拒否します。
 
@@ -36,13 +36,23 @@ bin/astra-jev desktop plan --repo /absolute/target/repo \
 
 ## Skillと資格情報
 
-Skillの呼び出しは、開発用のJev選別を使う依頼として扱います。Skillの`scripts/context.sh`は`select`・`check`・`read`へ`--require-jev`を付け、Jevを使わない選別経路や、Jev判定のない受け渡しを拒否します。通常は`--mode jev`で実行します。`local`と小さい入力の`auto`は、キー取得・API呼び出し・出力作成の前に拒否されます。有効な同一リクエストのキャッシュは利用できます。通常の進捗・完了報告にはJevの回数・token使用量・再利用件数・費用・出力bytesを追記しません。内訳を明示的に依頼された場合だけ保存済み記録から回答し、報告のための追加API・ベンチマーク・比較は実行しません。呼び出し上限と失敗時の復旧に必要な内部記録は維持します。
+Skillは既定で開発用のJev選別を使いますが、Jevの成功を許可済みの開発全体の前提にはしません。Skillの`scripts/context.sh`は`select`・`check`・`read`へ`--require-jev`を付け、Jevを使わない選別経路や、Jev判定のない受け渡しを拒否します。通常は`--mode jev`で実行します。`local`と小さい入力の`auto`は、キー取得・API呼び出し・出力作成の前に拒否されます。有効な同一リクエストのキャッシュは利用できます。通常の進捗・完了報告にはJevの回数・token使用量・再利用件数・費用・出力bytesを追記しません。内訳を明示的に依頼された場合だけ保存済み記録から回答し、報告のための追加API・ベンチマーク・比較は実行しません。呼び出し上限と失敗時の復旧に必要な内部記録は維持します。
 
-製品の実行時に有料モデルを呼ばないという制約と、許可済みの開発ファイル選別は別の範囲です。ただし、すべての外部送信・有料呼び出しを禁じる指示は守ります。認証不足やAPI失敗を理由にlocalへ黙って切り替えたり、記録を確認せず再実行したりしません。この確認はSkillの入口に適用され、会話全体のツールを自動的に制御するものではありません。任意の`output.py`の動作は変わりません。
+製品の実行時に有料モデルを呼ばないという制約と、許可済みの開発ファイル選別は別の範囲です。ただし、すべての外部送信・有料呼び出しを禁じる指示は守ります。認証不足やAPI失敗ではJevの処理を止め、記録を保持して「Jev未検証・ローカルで継続」と理由を明示します。Jev成功を装う切り替えや、記録を確認しない再実行は行いません。この確認はSkillの入口に適用され、会話全体のツールを自動的に制御するものではありません。任意の`output.py`の動作は変わりません。
 
 `Codex Desktop/skills/astra-jev-coding`をユーザーのSkillディレクトリから参照します。インストール済みSkillの`~/.codex/skills/astra-jev-coding/scripts/context.sh doctor`（`CODEX_HOME`を変更した場合は対応するパス）はsymlinkを解決して、このcheckoutの入口を使います。v0.3.0以前から更新した場合は`bin/astra-jev install`を再実行すると、このcloneを指す旧リンクを移行します。checkoutを削除・移動する際は参照も更新してください。
 
 `TYPESAFE_API_KEY`を優先し、未設定のmacOS環境ではlogin Keychainのservice `astra-jev-harness` / account `TYPESAFE_API_KEY`から取得します。キー値を出力せず、helperプロセス内だけで使います。`doctor`は外部APIを呼びません。plan/check/ヘルプはKeychainを読みません。
+
+## Jevを使えない場合も開発を続ける
+
+ユーザーがJevなしを選んだ場合、その選択を現在の課題と同じ範囲の続きへ引き継ぎ、同じ許可を聞き直しません。必須依存の予算超過、認証不足、provider障害でも、原因と「Jev未検証」を一度示し、既に許可された調査・実装・テストをローカルで続けます。Jevでの確認自体が必須の受入条件なら、その項目は未完了として分けます。
+
+- **十分なplanがある場合**：直接`bin/astra-jev desktop select --mode local`を使い、`check`・`read`も直接helperで実行します。Skillのwrapperは引き続きJev必須なので使いません。`local`はplan内の全候補を未判定として保持しますが、`scoped_out`のファイルは補いません。
+- **planが作れない／必要ファイルが含まれない場合**：`local`でもplanの予算超過は解決しません。対象checkout・HEAD・既存差分・必要ファイルを確認し、通常のファイルツールで必要な行を絞って読み、既存の編集権限で作業します。planの成功やJev判定済みを装いません。
+- **認証／provider障害の場合**：失敗記録を残し、自動再試行・認証情報の再探索・失敗した成果物の成功扱いをしません。保存済みの計画が十分かつ新鮮なら、新しい出力先でlocal選択を作れます。外部送信禁止なら外部呼び出しを行いません。
+
+秘密情報・path・鮮度の保護、既存差分の保持、読み取り量の上限、外部操作の承認範囲は維持します。`present`は直接helperでもJev判定を要求するため、localでは`read`または通常の範囲読み取りを使います。[具体的な手順と判断基準](skills/astra-jev-coding/references/local-continuation.md)。
 
 ## 選別の限界
 
@@ -79,4 +89,4 @@ bin/astra-jev desktop select --plan /absolute/context-plan \
 
 ## 本文の読み方と呼び出し省略
 
-本文を会話へ出す前にplan/selectを実行します。利用者がJevなしの比較・オフライン作業を明示的に求めた場合は、Skillの入口ではなく、このcheckoutの`Codex Desktop/context.py`を直接使います。オフライン・Jevなしを保証する場合は`--mode local`を使います。明示的な方式比較には`select --mode auto`も使えますが、12,000本文bytes未満では全候補を保持してJevを省略し、それ以上では呼び出す場合があります。既定は`jev`です。これらの省略はJev利用の依頼を満たすものではありません。`read`は鮮度確認後に80行既定・最大200行/24 KBを返し、APIを呼びません。通常入力・cache read/write・料金見積の区別と分割の仕様は[共通ガイド](../docs/CONTEXT-BUDGETS.md)を参照してください。
+Jev経路では本文を会話へ出す前にplan/selectを実行します。上記のローカル継続では、Jevの事前選別を必須にしません。helperを使う場合は`bin/astra-jev desktop`へ直接`--mode local`を指定します。明示的な方式比較の`--mode auto`は12,000本文bytes以上でJevを呼ぶ場合があるため、オフライン保証には使いません。localの結果はJev未検証です。`read`は鮮度確認後に80行既定・最大200行/24 KBを返し、APIを呼びません。通常入力・cache read/write・料金見積の区別と分割の仕様は[共通ガイド](../docs/CONTEXT-BUDGETS.md)を参照してください。

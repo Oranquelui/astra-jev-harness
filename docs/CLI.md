@@ -7,6 +7,26 @@ Run from the repository root. Use `bin/astra-jev cli --help` for the parser; the
 3. Inspect `result.json`, `REPORT.md`, `changes.diff`, and verification output. `verify --run RUN` reruns verification without another model request.
 4. `apply --run RUN` applies verified, unchanged edits. It checks source and candidate integrity, refuses collisions at new paths, and leaves edits uncommitted. Inspect `recovery_incomplete` if rollback could not fully complete; do not overwrite concurrent changes.
 
+## Continuing without Jev
+
+Jev is not a prerequisite for all authorized coding work. Honor a user's no-Jev choice for the current task and in-scope follow-ups without asking again. If required scope exceeds planning limits, credentials are unavailable, or Jev fails, stop that operation and state the reason and **“Jev selection unverified / Jev未検証 — continuing without Jev”** once. A successful Jev judgment explicitly required for acceptance remains incomplete; independent authorized work may continue.
+
+**CLI `--mode astra` skips Jev but still invokes Codex generation. It is not an offline mode.** The CLI accepts `auto`, `astra` and `jev`; `local` belongs to the Desktop/Claude context helpers. Use `astra` only when Codex generation and its code transmission are already authorized. A no-Jev choice alone does not authorize a new provider or another coding agent. `auto` can call Jev and does not guarantee no-Jev operation.
+
+With a fresh, sufficient CLI plan and existing generation authority, use a new run directory:
+
+```sh
+bin/astra-jev cli run --plan /absolute/plan \
+  --out /absolute/new-run-without-jev --mode astra \
+  --verify-json '["go", "test", "./..."]'
+```
+
+Use the target project's verification command. This route retains all in-plan candidates as unjudged, needs no TypeSafe credential lookup, and preserves Codex configuration, generation and verification requirements. It cannot restore `scoped_out` files or cure a Codex configuration/login failure. Keep the original failed run and partial-attempt receipts; inspect the failure stage before starting another run. Do not automatically retry, overwrite the old result, or relabel it as successful.
+
+If a valid plan cannot cover required files, preserve those files rather than dropping required focus/dependencies or repeatedly increasing caps. Continue investigation, implementation and tests with bounded native tools in the already-running coding session, within its existing authority. Recheck root, branch, HEAD, status, diff and relevant file contents before edits; keep reads focused (prefer 80 lines, at most 200 lines/24 KB). Do not spawn a replacement coding agent from Desktop or Claude Code. Without an authorized active coding session, continue available local preparation, diagnostics and tests; the harness generation remains incomplete. If all new external calls are prohibited, do not run `astra` or `auto`; honor that restriction in the current session as well.
+
+Local continuation keeps secret/path guards, source freshness, artifact integrity and external-action boundaries. Stop failed credential lookups without authentication resets or unrelated secret searches. `run → verify → apply` protections remain unchanged: a manual edit is not a verified harness candidate, failed/unverified candidates cannot be applied, and `verify --run` can rerun saved tests without another model generation. Routine replies report changes, verification and actionable blockers; show usage only on request from saved records, without extra benchmarks or calls.
+
 ## Creating files and editing tests
 
 Declare task-authorized changes during planning:
@@ -33,9 +53,9 @@ The configuration reader was checked with Codex CLI 0.153.2 without starting a m
 
 The verification command runs through `codex sandbox --permission-profile :read-only`. Dependencies are not installed automatically. Builds requiring generated files or unavailable dependencies can fail independently of the patch. Do not weaken the sandbox or tests to make a candidate pass.
 
-Jev: at most 24 requests; Astra: at most two generations, the second only for requested files already inside the plan. A `scoped_out` file requires a fresh focused plan. No automatic provider retries. Authentication, transport, schema, and verification failures are distinct from successful implementation. Generated edits and tests need normal review.
+Jev: at most 24 requests; Astra: at most two generations, the second only for requested files already inside the plan. Continuing harness generation with a `scoped_out` file requires a fresh sufficient plan; if required scope cannot fit, use the continuation guidance above. No automatic provider retries. Authentication, transport, schema, and verification failures are distinct from successful implementation. Generated edits and tests need normal review.
 
-For a large repository, CLI bounds the local shortlist to 350,000 source bytes. `run` also checks the serialized worst-case Astra prompt against its separate 500,000-byte limit **before** making a Jev request. If Astra needs a `scoped_out` path, create a fresh plan with that path as `--focus-file`; it cannot be edited from the old plan.
+For a large repository, CLI bounds the local shortlist to 350,000 source bytes. `run` also checks the serialized worst-case Astra prompt against its separate 500,000-byte limit **before** making a Jev request. To continue harness generation with a needed `scoped_out` path, create a fresh sufficient plan with that path as `--focus-file`; it cannot be edited from the old plan. If the required scope cannot fit, follow Continuing without Jev instead of repeatedly replanning.
 
 `result.json.selection` includes probabilities, per-file retention reasons, unjudged paths, and source-byte metrics. These are context diagnostics, not security or correctness guarantees. CLI keeps the conservative batch policy; experimental per-file selection belongs to the Desktop helper.
 

@@ -1,5 +1,13 @@
 # Changelog / 変更履歴
 
+## Unreleased
+
+- Clarify Desktop Skill local continuation for a user-chosen no-Jev workflow, required-scope budget errors, missing credentials, and provider failures. Preserve the choice across in-scope follow-ups without repeated approval. Keep incomplete Jev acceptance distinct from authorized local implementation.
+- Document direct local select/check/read for sufficient plans and bounded native reads when plans cannot cover required files. Keep Jev launcher checks, request caps, failure receipts, secret/freshness protection and no automatic retry; do not mislabel local work as Jev-selected. No runtime, version, or published-release change.
+- Desktop SkillにJev未検証を明示したローカル継続を追加。必須依存の予算超過と認証・provider障害を分け、同じ許可を聞き直さずに許可済みの調査・実装・テストを継続します。実行コード・版番号・公開済みリリースは変更しません。
+- Extend the continuation policy to the installed Claude Code Skill and Codex CLI guidance. Claude's wrapper supports local select/check/read directly; CLI `--mode astra` still requires authorized Codex generation and is not offline. Preserve failure receipts, sufficient-plan checks and verify/apply guards. Remove mandatory routine usage reporting from Claude guidance; keep internal records and request limits.
+- Claude Code SkillとCodex CLIの英日ガイドにも継続方針を反映。Claudeは既存wrapperのlocal経路を使い、CLIはJevなしでもCodex生成を行う点を明記。plan不足・失敗記録・検証／適用の制約を維持し、Claude側の使用量の定型報告も削除します。既存の実行経路を使う指示の修正で、runtime変更や自動fallbackは追加しません。
+
 ## v0.7.1 — 2026-09-29
 
 - Remove mandatory routine Jev accounting from the Codex Desktop Skill: planned/actual call counts, tokens, cache reuse, cost summaries, and output bytes. Progress and final replies focus on changes, verification, and actionable blockers.

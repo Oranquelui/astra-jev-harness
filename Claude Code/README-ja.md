@@ -2,7 +2,7 @@
 
 [English](README.md) · [リポジトリ全体の説明](../README-ja.md)
 
-[`claude-jev-coding`](skills/claude-jev-coding/SKILL.md)は、Claude Codeで使うエージェントスキルです。現在のClaude Codeセッションが通常のツールで実装・レビュー・変更に応じた検証を行い、Jevはファイルの関連性だけを判定します。`Claude Code/context.py`は、Codex Desktop版と共通の選別処理（`shared/host_context.py`）を呼び出すツールです。Codex・Astra・別のコーディングエージェントを起動することはありません。
+[`claude-jev-coding`](skills/claude-jev-coding/SKILL.md)は、Claude Codeで使うエージェントスキルです。現在のClaude Codeセッションが通常のツールで実装・レビュー・変更に応じた検証を行い、Jevはファイルの関連性だけを判定します。インストール済みのwrapperは`bin/astra-jev claude-code`を実行し、Desktopと共通のnative処理を使います。Codex・Astra・別のコーディングエージェントを起動することはありません。
 
 ビルド済みの`bin/astra-jev`とGitが必要です。Harnessの実行にPythonは不要です。
 
@@ -49,6 +49,14 @@ Skillは、**現在のClaude Codeセッションで選択しているモデル�
 
 - 新しいplan・選別結果にはsurface `claude-code`を記録します。Claude Code版はDesktop・CLI版のplanや選別結果を受け付けず、Desktop・CLI版もClaude Code版の成果物を受け付けません。
 - Jevを呼ばない経路は`local`と記録します。子プロセスによる生成回数の項目は`astra_child_calls`ではなく、`child_generation_calls: 0`です。
+
+## ローカル継続
+
+ユーザーがJevなしを選んだ場合、必須ファイルの予算超過、認証情報の利用不可、Jevの障害では、原因と「Jev未検証 — ローカルで継続」を一度伝え、現在のセッションで許可済みの作業を続けます。同じ課題と範囲内の継続作業では選択を引き継ぎ、許可を聞き直しません。Jevの成功自体が明示的な完了条件なら、その項目は未完了として残します。
+
+新鮮で十分なClaude用planがあれば、インストール済みの`scripts/context.sh`で`select --mode local`・`check`・`read`を実行できます。Desktop用の`--require-jev`は付加しません。localはplan内の候補を未判定として保持し、`scoped_out`は復元しません。`present`には引き続きJev判定が必要です。十分なplanがなければ、実際に必要なファイルを通常ツールで範囲読み取りし、鮮度・秘密情報・既存差分・許可範囲を守ります。失敗記録を残し、自動再試行や、planを成功させるための必須依存の削除・上限の反復引き上げはしません。[手順と制約](skills/claude-jev-coding/references/workflow.md#local-continuation)。
+
+通常の返信は変更・検証・対処が必要な問題に絞ります。使用量は明示的な依頼時だけ保存済み記録から回答し、報告のためのAPI呼び出しやベンチマークは追加しません。
 
 ## 認証情報と制限
 
