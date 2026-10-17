@@ -10,7 +10,8 @@ import time
 import urllib.error
 import urllib.request
 
-JEV_MODEL = "jev-1.13.0"
+JEV_MODEL = "jev-1.14.0"
+HARNESS_VERSION = (Path(__file__).resolve().parents[1] / "VERSION").read_text().strip()
 
 
 class ProtocolError(ValueError):
@@ -139,7 +140,7 @@ def request_jev(payload):
     body = json.dumps(payload, ensure_ascii=False).encode()
     req = urllib.request.Request("https://api.typesafe.ai/v1/systemone", data=body,
                                  headers={"Authorization": "Bearer " + key, "Content-Type": "application/json",
-                                          "User-Agent": "astra-jev-harness/0.6.0 (+https://github.com/Oranquelui/astra-jev-harness)"})
+                                          "User-Agent": f"astra-jev-harness/{HARNESS_VERSION} (+https://github.com/Oranquelui/astra-jev-harness)"})
     start = time.monotonic()
     def failed(kind, code=None):
         return ProtocolError(f'TypeSafe {kind}' + (f' HTTP {code}' if code else '') + '; no automatic retry',

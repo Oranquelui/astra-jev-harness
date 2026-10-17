@@ -1,6 +1,6 @@
 # Astra + Jev: Codex and Claude Code Agent Skills
 
-[日本語](README-ja.md) · [Version 0.7.2](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
+[日本語](README-ja.md) · [Version 0.7.3](VERSION) · [Tagged releases](https://github.com/Oranquelui/astra-jev-harness/releases) · [Changelog](CHANGELOG.md)
 
 This repository provides the **[`astra-jev-coding` Codex Agent Skill](Codex%20Desktop/skills/astra-jev-coding/SKILL.md) for Codex Desktop** and a separate harness for Codex CLI. Install the Skill to use Jev for context selection while the current Desktop conversation implements the task; the CLI workflow runs Codex separately. A separate **[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md) for Claude Code** applies the same context selection to the current Claude Code session.
 
@@ -8,13 +8,32 @@ Narrow large repositories locally, let **Jev judge the bounded candidates**, the
 
 ![Astra + Jev architecture: the Harness prepares candidate files, Jev assesses relevance while retaining uncertain context and dependencies, and Astra implements and tests the change.](docs/assets/astra-jev-concept-en.webp)
 
-*The Go architecture introduced in v0.7.0 also applies to v0.7.2. This concept illustration shows the Codex Desktop workflow; it is not a cost or speed benchmark.*
+*The Go architecture introduced in v0.7.0 also applies to v0.7.3. This concept illustration shows the Codex Desktop workflow; it is not a cost or speed benchmark.*
 
 A local coding harness for Codex CLI, Codex Desktop and Claude Code. Give it a task such as “fix pagination without changing the public API”; it snapshots eligible files, locally narrows oversized repositories, asks Jev which candidates the coding model needs, preserves dependencies, and records what was kept and why.
 
 **Goal:** reduce Astra token consumption and combined inference cost while preserving coding correctness and avoiding extra turnaround time. File selection is a means to that goal. The Claude Code Skill extends the same goal to Claude; its savings are not yet measured.
 
 **Experimental.** In a historical **v0.3.0** comparison, one synthetic CLI coding task at **Astra Extra High (`xhigh`)** used **27.0% fewer Astra input tokens** and **27.2% less at equivalent Standard API rates**, including Jev. Both modes passed the same six checks. Elapsed time was 7.3% shorter in this pair, but 34.6% longer in a separate `medium` pair. Each is one trial per mode, not a general speedup or Desktop result. [Measurements and limits](docs/BENCHMARKS.md).
+
+## v0.7.3: pin Jev 1.14 across the native workflows
+
+The shared Go runtime moves new Jev work from `jev-1.13.0` to **`jev-1.14.0`** for Codex Desktop, Codex CLI and Claude Code, including evidence and optional progress-log selection. It uses a fixed model ID, not `jev-latest` or `jev-preview`; an alias change cannot silently switch these requests. The coding model and its settings are unchanged.
+
+| Area | v0.7.3 behavior |
+|---|---|
+| Model update | Use the fixed 1.14 model while retaining conservative selection thresholds, uncertainty/dependency retention and existing input/request limits. |
+| Cache and saved judgments | The model remains part of the full-request cache key. Old 1.13 judgments stay identified as 1.13; they are not relabeled or reused as 1.14 judgments. No bulk cache deletion is needed. |
+| Host guidance | Update both installed Skills and the separate CLI guide together. All three use the same native executable; CLI has no separate installable Skill in this repository. |
+| Failure and reporting | Preserve Jev-unverified local continuation, no automatic retries, internal recovery receipts and usage reporting only when explicitly requested. |
+
+As of 2026-10-17, TypeSafe lists the same **$0.042 per million input tokens, free output, 64k per-request and 32k per-question standard limits** for 1.13 and 1.14. TypeSafe reports multilingual improvements in 1.14; this is a vendor claim, **not a measured improvement in Harness coding quality, speed or total cost**. Local candidate matching still does not translate Japanese tasks: add reviewed paths/identifiers or `--focus-file` where needed. This patch does not add semantic exploration, image input, `box`, long-context mode, recurring benchmarks or automatic model comparisons. [Official models](https://docs.typesafe.ai/models) · [1.14 announcement](https://typesafe.ai/blog/jev-1-14).
+
+For an upgrade, preserve local changes and failed run records, update the checkout to **v0.7.3**, and replace `bin/astra-jev` with the checksum-verified matching release executable, or build once from that checkout. Existing Skill symlinks then load the updated guidance. Create a fresh plan and new output directories for new 1.14 work; checking old results still checks their original judgments and source freshness, not a new 1.14 evaluation. Keep saved artifacts outside Git.
+
+For rollback, use the **v0.7.2 executable with its matching checkout/resources**, preserve failed artifacts, and create a fresh plan and new outputs. If using a separate installation directory, verify and repoint only the Skill symlinks belonging to this installation; the installer refuses to overwrite another Skill. Keep credentials and user model settings intact. [Native installation](docs/GO-MIGRATION.md) · [Desktop guide](Codex%20Desktop/README.md) · [Claude guide](Claude%20Code/README.md) · [CLI guide](docs/CLI.md).
+
+Validation for this patch: native Go tests with race detection and the Python compatibility oracle passed, as did the 200-test retained Python suite. A bounded live check with the new executable received `jev-1.14.0` responses and retained the required implementation, configuration and test files in English/Japanese synthetic tasks; source-freshness checks also passed. This verifies connectivity and those fixtures, not general coding accuracy or a speed/cost improvement.
 
 ## v0.7.2: continue authorized work when Jev is unavailable
 

@@ -2,6 +2,16 @@
 
 Run from the repository root. Use `bin/astra-jev cli --help` for the parser; the root `coding.py` remains a compatibility entrypoint without Keychain supplementation.
 
+## v0.7.3 model update
+
+New Jev requests use fixed `jev-1.14.0`, through the native runtime shared by CLI, Desktop and Claude Code; aliases are not used. This does not change the configured Codex generator model/effort. CLI is a separate `bin/astra-jev cli` workflow, not a third installable Skill in this repository.
+
+Upgrade the executable and checkout/resources together; use a fresh plan and new run directory. Plans do not pin a model, so new runs from old plans also use the current runtime's Jev model. Exact-request cache keys include that model: 1.13 cache entries cannot satisfy 1.14 requests and need not be deleted. Preserve saved judgments and failure records with their original identity; a model upgrade does not re-evaluate prior decisions or reverify a candidate. Rollback uses the v0.7.2 executable with matching resources and fresh plans/outputs. Source freshness, artifact integrity and verify/apply permissions remain enforced.
+
+Selection thresholds, input/request limits, no automatic retries, authorized continuation without Jev and request-only usage reports remain unchanged. TypeSafe's reported multilingual improvement is not a measured Harness coding-quality, speed or cost improvement. [Official models](https://docs.typesafe.ai/models) · [Release details](../README.md#v073-pin-jev-114-across-the-native-workflows).
+
+## Basic workflow
+
 1. `plan --repo ROOT --task-file TASK --out PLAN`: snapshot eligible tracked files locally, outside the source repository. Above 2 MB or 1,500 eligible files, add reviewed `--focus-file PATH` values and optionally `--scope-max-calls N` (default 4) to bound the local shortlist before Jev. Review retained and `scoped_out` paths in `PLAN.md`; required-file recall is unknown without labels. Preserve existing changes.
 2. `run --plan PLAN --out RUN --mode jev --verify-json '["python3","-B","-m","unittest","discover"]'`: select context, generate full-file replacements using your Codex login, and verify an isolated candidate. Adapt the argument-array verification command to your project. Do not pass a shell string. `auto` skips Jev for a small context; an explicit Jev request should use `jev`.
 3. Inspect `result.json`, `REPORT.md`, `changes.diff`, and verification output. `verify --run RUN` reruns verification without another model request.

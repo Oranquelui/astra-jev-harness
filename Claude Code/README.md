@@ -6,6 +6,12 @@
 
 Requires the compiled `bin/astra-jev` executable and Git; Python is not a runtime dependency. No extra Python packages are needed.
 
+## v0.7.3 model update
+
+New Jev requests use fixed **`jev-1.14.0`**, through the native runtime shared with Desktop and CLI. It does not follow model aliases or change your active Claude model. TypeSafe reports multilingual improvements; Harness coding-quality, speed and total-cost improvements have not been measured. Existing thresholds, input bounds, no-retry behavior, local continuation and request-only usage reporting remain. [Official model specifications](https://docs.typesafe.ai/models) · [Release details](../README.md#v073-pin-jev-114-across-the-native-workflows).
+
+Update the checkout/resources and executable together, then create a fresh plan and new output directories. Plans do not pin a model: selecting anew from an old plan also uses the current runtime's 1.14. Saved 1.13 judgments keep their original model and freshness checks; checking them does not call or validate 1.14. Model-containing request keys keep caches separate without deleting old entries. To roll back, use the matching v0.7.2 executable/resources with a fresh plan and new outputs, preserving old results and failure records. Existing Skill symlinks read the updated files; only repoint your own installation's link if changing directories. [Saved-judgment and rollback details](skills/claude-jev-coding/references/workflow.md#model-updates-and-saved-judgments).
+
 ## Install and check
 
 Run these commands from the root of the cloned harness repository.

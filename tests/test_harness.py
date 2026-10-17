@@ -1,15 +1,41 @@
 import copy
+import tempfile
 import unittest
 from unittest.mock import patch
 import urllib.error
 
 import harness as h
 from fixtures import CASES
+from shared import evidence, jev, tool_output
 
 
 def reply(values):
-    return {"model": "jev-1.13.0", "usage": {"input_tokens": 123, "output_tokens": 4},
+    return {"model": jev.JEV_MODEL, "usage": {"input_tokens": 123, "output_tokens": 4},
             "answers": {f"f{i}": {"type": "noul", "noul": v} for i, v in enumerate(values)}}
+
+
+class ModelCompatibilityTests(unittest.TestCase):
+    def test_fixed_model_and_versioned_cache_for_all_request_types(self):
+        payloads = {
+            'context': jev.jev_request(CASES[0]),
+            'evidence': evidence.payload('Check behavior', [{'text': 'Preserve behavior.'}]),
+            'output': tool_output.payload('Check tests', '', [{'text': 'Progress only.'}]),
+        }
+        for name, payload in payloads.items():
+            with self.subTest(surface=name), tempfile.TemporaryDirectory() as cache:
+                self.assertEqual(payload['model'], 'jev-1.14.0')
+                answers = {key: {'type': 'noul', 'noul': .9} for key in payload['questions']}
+                legacy_payload = dict(payload, model='jev-1.13.0')
+                legacy = {'model': 'jev-1.13.0', 'answers': answers}
+                current = {'model': 'jev-1.14.0', 'answers': answers}
+                jev.write_cache(legacy_payload, legacy, cache)
+                self.assertIsNone(jev.read_cache(payload, cache))
+                for model in ('jev-1.13.0', 'jev-latest', 'jev-preview'):
+                    with self.assertRaisesRegex(jev.ProtocolError, 'Unexpected Jev model'):
+                        jev.validate_response(payload, dict(current, model=model))
+                jev.write_cache(payload, current, cache)
+                self.assertEqual(jev.read_cache(payload, cache), current)
+                self.assertEqual(jev.read_cache(legacy_payload, cache), legacy)
 
 
 class SelectionTests(unittest.TestCase):
@@ -45,6 +71,9 @@ class SelectionTests(unittest.TestCase):
             self.assertNotIn("fixture-secret", str(raised.exception))
             self.assertIn("401", str(raised.exception))
             self.assertEqual(make.return_value.open.call_count, 1)
+            request = make.return_value.open.call_args.args[0]
+            self.assertEqual(request.get_header('User-agent'),
+                             f'astra-jev-harness/{jev.HARNESS_VERSION} (+https://github.com/Oranquelui/astra-jev-harness)')
 
     def test_redirect_is_refused(self):
         with self.assertRaises(h.ProtocolError):

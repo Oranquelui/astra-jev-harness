@@ -120,6 +120,9 @@ func TestNativeHTTPNoRetryRedirectOrBodyLeak(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		calls++
+		if req.Header.Get("User-Agent") != "astra-jev-harness/"+Version+" (+https://github.com/Oranquelui/astra-jev-harness)" {
+			t.Error("transport must identify the running harness version")
+		}
 		w.WriteHeader(503)
 		fmt.Fprint(w, "secret-body-marker")
 	}))

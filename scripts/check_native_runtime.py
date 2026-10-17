@@ -7,11 +7,13 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from shared import repo_context as rc
-from shared.jev import jev_request, JEV_MODEL, write_cache
+from shared import jev
+from shared.jev import jev_request, write_cache
 from desktop import context as desktop
 
 
@@ -54,7 +56,7 @@ def main():
         def fill_cache(plan):
             for batch in rc.jev_batches(plan):
                 request = jev_request(rc.selection_case(plan, batch))
-                response = {'model': JEV_MODEL, 'answers': {
+                response = {'model': request['model'], 'answers': {
                     key: {'type': 'noul', 'noul': .9} for key in request['questions']}}
                 write_cache(request, response, cache)
 
@@ -69,11 +71,20 @@ def main():
         assert run('desktop', 'present', '--selection', selected)['provider_calls'] == 0
         record = json.loads((selected / 'selection.json').read_text())
         assert record['attempted_calls'] == 0 and all(c['reused'] for c in record['jev_calls'])
+        assert all(c['model'] == 'jev-1.14.0' for c in record['jev_calls'])
         old_plan, old_selection = base / 'python-plan', base / 'python-selected'
         p = desktop.make_plan(repo, task, old_plan)
-        fill_cache(p)
-        desktop.select(old_plan, old_selection, cache_dir=cache, mode='jev', require_jev=True)
+        # Reproduce a saved v0.7.2 selection; upgrade checks must preserve its
+        # historical model identity instead of relabeling it as a new judgment.
+        with patch.object(jev, 'JEV_MODEL', 'jev-1.13.0'):
+            fill_cache(p)
+            desktop.select(old_plan, old_selection, cache_dir=cache, mode='jev', require_jev=True)
+        old_receipt = (old_selection / 'selection.json').read_bytes()
+        old_record = json.loads(old_receipt)
+        assert old_record['jev_calls'] and all(c['model'] == 'jev-1.13.0' for c in old_record['jev_calls'])
         assert run('desktop', 'check', '--selection', old_selection, '--require-jev')['status'] == 'fresh'
+        assert run('desktop', 'read', '--selection', old_selection, '--path', 'main.py', '--require-jev')['text'] == (repo / 'main.py').read_text()
+        assert (old_selection / 'selection.json').read_bytes() == old_receipt
         skills = base / 'skills'
         # Install into a disposable destination; actual user Skills are untouched.
         run('--harness-root', ROOT, 'install', '--skills-dir', skills)
@@ -85,6 +96,7 @@ def main():
         (repo / 'lib.py').write_text('value = 43\n')
         run('check', '--selection', selected, launcher=launcher, ok=False)
         print(json.dumps({'native_runtime': 'passed', 'legacy_artifact_cross_read': 'passed',
+                          'legacy_jev_1_13_identity': 'preserved',
                           'installed_skill': 'passed', 'python_or_go_child_calls': 0,
                           'live_provider_calls': 0, 'timing_runs': 0}))
 

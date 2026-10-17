@@ -1,5 +1,16 @@
 # Changelog / 変更履歴
 
+## v0.7.3 — 2026-10-17
+
+- Pin new Jev work to `jev-1.14.0` across the shared Go runtime and retained Python compatibility reference, covering Desktop, CLI, Claude Code, evidence and opt-in output selection. Keep fixed-version response checks, conservative selection policy and existing budgets; do not introduce aliases, long context, images or retries.
+- Preserve model identity in saved judgments and model-containing request/cache hashes. Old 1.13 results remain 1.13 results; freshness checks do not relabel them as a new model evaluation. Keep local continuation, failure receipts and request-only usage reporting.
+- Update the Desktop and Claude Code Skills, the separate native CLI guides, both root READMEs and version metadata. Document matching-executable upgrades and v0.7.2 rollback with fresh plans/new outputs, preserving old artifacts and caches. Keep English/Japanese WebP concept illustrations. TypeSafe's multilingual-improvement statement is not a measured Harness speed, cost or coding-quality claim.
+- Keep the provider User-Agent aligned with the actual Harness release. Native race/oracle tests and the 200-test Python suite passed; a bounded live 1.14 check retained required implementation/configuration/test files for English/Japanese synthetic tasks and passed freshness checks. This is not a comparative model-quality or performance benchmark.
+- 共通Go実行系とPython検証用コードで、新しいJev処理を`jev-1.14.0`へ固定。Desktop・CLI・Claude Code・評価資料・任意のログ選別を揃え、応答モデル検証、保守的な選別と既存上限を維持します。alias、長文context、画像、自動retryは追加しません。
+- 保存済み判定のモデル識別と、モデル名を含むリクエスト・cacheハッシュを維持。旧1.13判定を1.14判定として扱わず、鮮度確認を再評価と混同しません。ローカル継続、失敗記録、明示依頼時だけの使用量報告を維持します。
+- Desktop・Claude Code Skills、独立したCLIガイド、英日READMEとversionを更新。同版実行ファイルへの更新とv0.7.2への復帰、新しいplan・出力先の利用、旧成果物・cacheの保持を説明し、英日WebP概念図を維持します。提供元の多言語改善の説明と、Harnessで未測定の精度・速度・費用効果を区別します。
+- providerのUser-Agentを実際のHarness版と同期。nativeのrace・互換テストとPython200件が成功し、限定的な実接続で1.14の応答、日本語・英語の合成課題の必要な実装・設定・テスト保持、鮮度検査を確認しました。モデル品質や性能の比較ベンチマークではありません。
+
 ## v0.7.2 — 2026-10-01
 
 - Clarify Desktop Skill local continuation for a user-chosen no-Jev workflow, required-scope budget errors, missing credentials, and provider failures. Preserve the choice across in-scope follow-ups without repeated approval. Keep incomplete Jev acceptance distinct from authorized local implementation.

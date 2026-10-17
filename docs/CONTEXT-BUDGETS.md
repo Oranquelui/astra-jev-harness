@@ -4,7 +4,7 @@
 
 New plans use `context_format: fragments-v1`. Eligible sources are split losslessly into bounded ranges, preferring line boundaries. Long lines split at Unicode character boundaries. Each range records its original path, byte offsets and line numbers; the ranges cover the complete file, including its tail. One independent Noul question judges each range. Several questions share one request's state. Nothing is silently truncated, and crossing the old 22 KB batch size no longer makes a new-plan file automatically unjudged.
 
-The official Jev 1.13 limits are **32k tokens for state plus the longest question** and **64k tokens for the whole request**. This dependency-free harness does not have an official Jev tokenizer. It uses serialized UTF-8 JSON bytes plus a 1,024-unit reserve as a conservative **estimate**, capped at 30,000 / 60,000 respectively. Questions, paths, metadata and JSON escaping count too. Fragments target at most 12,000 serialized bytes and requests contain at most 32 questions. These are local planning budgets, not provider limits or exact token counts. `plan.json.inference` exposes the method and largest estimated request; the API response supplies actual usage. A provider rejection stops without retry.
+The official standard limits for Jev 1.13 and 1.14 are **32k tokens for state plus the longest question** and **64k tokens for the whole request**, as listed in the [model documentation](https://docs.typesafe.ai/models) on 2026-10-17. This dependency-free harness does not have an official Jev tokenizer. It uses serialized UTF-8 JSON bytes plus a 1,024-unit reserve as a conservative **estimate**, capped at 30,000 / 60,000 respectively. Questions, paths, metadata and JSON escaping count too. Fragments target at most 12,000 serialized bytes and requests contain at most 32 questions. These are local planning budgets, not provider limits or exact token counts. `plan.json.inference` exposes the method and largest estimated request; the API response supplies actual usage. A provider rejection stops without retry.
 
 `--scope-max-calls` now also triggers local candidate scoping when the request budget is exceeded even below 2 MB. All ranges of each retained file count toward that budget. Mandatory files and their dependencies must fit, or planning fails before credentials or provider calls. Check locally scoped-out files for missing task context.
 
@@ -32,7 +32,7 @@ bin/astra-jev desktop read --selection /absolute/selection --path src/main.py \
 Optional `--prices /absolute/prices.json` accepts USD-per-million rates keyed by exact returned model ID. For example, a file containing only the verified Jev rate is:
 
 ```json
-{"jev-1.13.0": {"input": 0.042, "output": 0}}
+{"jev-1.14.0": {"input": 0.042, "output": 0}}
 ```
 
 Add verified `input`, `output`, `cache_read` and `cache_write` rates for the specific Astra model to estimate its cost. Rates are not guessed or fetched by the script. Each input token belongs to exactly one price category; cache-write cost is not added on top of ordinary-input cost. Missing model/rate/usage/cache details leave that provider's estimate incomplete. All-provider `dollar_cost` stays null until both providers are fully accounted for. These estimates are not invoices or Codex subscription quota measurements.

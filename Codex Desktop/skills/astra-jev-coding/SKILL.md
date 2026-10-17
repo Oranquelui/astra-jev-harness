@@ -9,6 +9,8 @@ Use Jev for bounded file-relevance judgments. The active Desktop conversation pe
 
 ## Entrypoint and credentials
 
+Harness v0.7.3 uses fixed `jev-1.14.0` for new Jev requests, including requests made from an older plan; it does not follow `jev-latest` or `jev-preview`. The same native runtime serves Desktop, CLI and Claude Code. Existing 1.13 judgments remain 1.13 judgments: `check` verifies saved artifacts and freshness, not a new model evaluation. Model IDs are part of exact-request cache keys, so old cache entries need no bulk deletion. Use a fresh plan/new output directory for work after an upgrade. Keep the matching checkout and executable together; rollback uses v0.7.2 with fresh outputs, preserving failed records. Do not silently retry, switch models or upgrade old judgments.
+
 The supported runtime is the prebuilt Go executable in `bin/astra-jev`. Python and Go are not needed during coding. Build once with `scripts/build-native.sh` (Go 1.26+ and a C compiler), or use the matching platform release archive. Do not rebuild, benchmark or run model comparisons during normal coding. The historical `.py` files remain development references.
 
 

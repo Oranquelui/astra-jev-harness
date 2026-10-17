@@ -94,7 +94,7 @@ func (r *Runtime) request(payload M, key string) (M, M) {
 	need(err == nil, "Invalid provider configuration")
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "astra-jev-harness/0.7.0 (+https://github.com/Oranquelui/astra-jev-harness)")
+	req.Header.Set("User-Agent", "astra-jev-harness/"+Version+" (+https://github.com/Oranquelui/astra-jev-harness)")
 	res, err := r.client.Do(req)
 	if err != nil {
 		kind := "connection_error"

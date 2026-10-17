@@ -1,6 +1,6 @@
 # Astra + Jev：Codex・Claude Code向けエージェントスキル
 
-[English](README.md) · [バージョン 0.7.2](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
+[English](README.md) · [バージョン 0.7.3](VERSION) · [タグ付きリリース](https://github.com/Oranquelui/astra-jev-harness/releases) · [変更履歴](CHANGELOG.md)
 
 このリポジトリは、**Codex Desktop用の[`astra-jev-coding`エージェントスキル](Codex%20Desktop/skills/astra-jev-coding/SKILL.md)**と、別方式のCodex CLI用ハーネスを配布します。DesktopではJevが読むファイルを選び、現在の会話モデルが実装します。CLI版は別プロセスでCodexを実行します。別途、**Claude Code用の[`claude-jev-coding` Skill](Claude%20Code/skills/claude-jev-coding/SKILL.md)**を追加し、同じコンテキスト選別を現在のClaude Codeセッションで使えるようにしました。
 
@@ -8,13 +8,32 @@
 
 ![Astra + Jevの構成：Harnessが候補ファイルを整理し、Jevが不確実な情報・依存関係を保持しながら関連性を判断し、Astraが実装・検証する。](docs/assets/astra-jev-concept-ja.webp)
 
-*v0.7.0で導入したGo実行版の構成は、v0.7.2でも共通です。Codex Desktopでの役割分担を示す概念図で、費用・速度の実測結果ではありません。*
+*v0.7.0で導入したGo実行版の構成は、v0.7.3でも共通です。Codex Desktopでの役割分担を示す概念図で、費用・速度の実測結果ではありません。*
 
 Codex CLI・Codex Desktop・Claude Code向けのローカルCoding Harnessです。「公開APIを変えずにページングを修正して」といった課題から、対象ファイルをスナップショット化し、大きなrepoでは候補をローカルで絞ってからJevが関連性を判断します。依存ファイルを補い、何を残したか、その理由も記録します。
 
 **目的：** コードの正しさを保ちながら、Astraの消費tokenと推論全体の費用を減らし、完成までの時間・手戻りも抑えることです。ファイル選別はそのための手段です。Claude Code版も同じ目的をClaudeに広げますが、その削減効果は未測定です。
 
 **実験段階です。** 過去の**v0.3.0**で、**Astra Extra High（`xhigh`）**で合成CLI課題を修正・テストまで比較すると、**Astra入力27.0%減、Jev込みのStandard API単価換算27.2%減**でした。両方式とも同じ6件の確認に成功。所要時間はこの比較では7.3%減でしたが、別の`medium`比較では34.6%増でした。各方式1試行であり、一般的な高速化やDesktopでの効果は示しません。[測定条件と結果](docs/BENCHMARKS.md)。
+
+## v0.7.3：各方式のJevを1.14固定版へ更新
+
+共通のGo実行系で、新しいJev処理の指定を`jev-1.13.0`から**`jev-1.14.0`**へ更新しました。Codex Desktop・Codex CLI・Claude Codeに加え、評価資料と任意の進捗ログ選別にも適用します。`jev-latest`や`jev-preview`ではなく固定IDを使うため、aliasの参照先変更で切り替わりません。コードを書くモデルとその設定は変更しません。
+
+| 対象 | v0.7.3の動作 |
+|---|---|
+| モデル更新 | 1.14固定版を使い、保守的な判定閾値、不確実な文脈・依存の保持、既存の入力・呼び出し上限を維持します。 |
+| cache・保存済み判定 | リクエスト全体のcacheキーにモデル名を含めます。旧1.13の判定は1.13として保持し、1.14の判定へ書き換えたり流用したりしません。cacheの一括削除は不要です。 |
+| 各環境の案内 | 2つのインストール用Skillsと、独立したCLIガイドを同期します。3方式は共通のnative実行ファイルを使い、このrepoにCLI専用の別Skillはありません。 |
+| 失敗時と報告 | Jev未検証を明示したローカル継続、自動retryなし、復旧用の内部記録、明示依頼時だけの使用量報告を維持します。 |
+
+2026年10月17日時点の公式仕様では、1.13と1.14はともに**入力100万tokenあたり$0.042・出力無料、標準上限はリクエスト64k・質問32k**です。TypeSafeは1.14で多言語対応の改善を発表していますが、これは提供元の説明であり、**HarnessのCoding精度・速度・総費用の改善を実測した結果ではありません**。ローカルの候補選びは引き続き日本語を翻訳しないため、必要に応じて確認済みのパス・識別子や`--focus-file`を使います。自動の意味探索、画像入力、`box`、長文context、常時ベンチマーク、自動モデル比較は追加していません。[公式モデル仕様](https://docs.typesafe.ai/models) · [1.14の発表](https://typesafe.ai/blog/jev-1-14)。
+
+更新時は既存差分と失敗記録を保持し、checkoutを**v0.7.3**へ更新したうえで、checksum確認済みの同版の実行ファイルに`bin/astra-jev`を置き換えるか、そのcheckoutから一度ビルドします。既存のSkill参照リンクは更新後の指示を読み込みます。1.14で新たに作業するときは新しいplanと出力先を作成してください。旧結果の`check`は元の判定とソースの鮮度を確認するもので、1.14による再評価にはなりません。保存済み成果物はGit外に保持します。
+
+戻す場合は、**v0.7.2の実行ファイルと対応するcheckout・資材を組み合わせ**、失敗記録を残して新しいplan・出力先を作ります。別ディレクトリに戻す場合は、この導入で作成したSkillリンクを確認して、そのリンクだけを差し替えます。installerは別のSkillを上書きしません。認証情報とユーザーのモデル設定は維持します。[native導入手順](docs/GO-MIGRATION.md) · [Desktopガイド](Codex%20Desktop/README.md) · [Claudeガイド](Claude%20Code/README-ja.md) · [CLIガイド](Codex%20cli/README.md)。
+
+この版では、Goのrace検出・Python互換比較を含むテストと、保持しているPythonテスト200件が成功しました。新しい実行ファイルでの限定的な実接続確認では、`jev-1.14.0`の応答を確認し、日本語・英語の合成課題で必要な実装・設定・テストファイルを保持できました。ソースの鮮度検査も成功しています。接続と当該ケースの動作確認であり、一般的なCoding精度や速度・費用改善の証明ではありません。
 
 ## v0.7.2：Jevが使えない場合も許可済みの作業を継続
 

@@ -2,4 +2,4 @@
 
 手順と制限は[Codex cli/README.md](Codex%20cli/README.md)へ移しました。
 
-入口は `python3 "Codex cli/main.py"`。rootの `coding.py` は既存スクリプト向けの互換入口です（Keychain補完は`Codex cli/main.py`側）。Desktop版は[Codex Desktop/README.md](Codex%20Desktop/README.md)を参照してください。
+現行版の入口は `bin/astra-jev cli`。v0.7.3は新しいJev要求を`jev-1.14.0`へ固定し、生成用Codexのモデル設定は変更しません。Pythonは実行時に不要で、rootの `coding.py` はソースcheckoutに残した開発・互換検証用の入口です。英語の[CLIガイド](docs/CLI.md)と、別方式の[Codex Desktopガイド](Codex%20Desktop/README.md)も参照してください。

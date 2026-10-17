@@ -2,6 +2,12 @@
 
 Read only the section you need.
 
+## Model updates and saved judgments
+
+Harness v0.7.3 uses fixed `jev-1.14.0` for new provider requests. Plans do not pin a model; selecting from an old plan uses the current runtime's model, so create a fresh plan and new outputs after upgrading. Existing saved 1.13 judgments keep their recorded model. `check`, `read` and offline `compare` can inspect valid saved judgments; they do not call 1.14, refresh stale source or establish new-model validation. Cache identity includes the model and full request, so 1.13 entries cannot satisfy a 1.14 request. Do not bulk-delete caches or overwrite failed attempts.
+
+Upgrade the native executable and its checkout/resources together. To roll back, use v0.7.2's executable with its matching resources, create a fresh plan/new outputs, and preserve prior artifacts. If moving directories, verify and change only this installation's Skill symlink; the installer refuses to overwrite another Skill. Credentials and the active coding model stay unchanged. No automatic model fallback, retries or additional comparison calls are introduced.
+
 ## Large repositories and planning failures
 
 Snapshots include tracked and explicitly included untracked eligible UTF-8 files, up to 2 MB, 1,500 files and 100 KB per file. When a repository exceeds these limits or the planned request budget, `plan` first narrows candidates by local lexical task/file matching. The matcher does not translate a Japanese-only task, so add a reviewed `--focus-file <relative-path>` when there is no ASCII identifier or path. `--scope-max-calls <1..24>` (default 4) caps the planned requests. This cap is separate from `select --max-calls`.

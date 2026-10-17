@@ -10,7 +10,7 @@ import (
 )
 
 const contextFormat = "fragments-v1"
-const jevModel = "jev-1.13.0"
+const jevModel = "jev-1.14.0"
 
 type batch struct {
 	Keys []string

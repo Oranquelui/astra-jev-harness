@@ -2,6 +2,14 @@
 
 主対象はLayerisとUnsolojiです。既存ソースの編集、計画で指定したソース・テストの追加、既存テストの更新を、確認可能な計画・差分・検証結果として作るローカルCLIです。Astraは既存のCodexログイン、Jevは`TYPESAFE_API_KEY`を利用します。CodexのModelメニューやユーザー設定を書き換えません。
 
+## v0.7.3のモデル更新
+
+CLIの新しいJev要求は、Desktop・Claude Codeと同じnative実行系で**`jev-1.14.0`を固定指定**します。`jev-latest`・`jev-preview`へ追従せず、生成するCodexのモデル・effortは従来どおりユーザー設定を引き継ぎます。このrepoのCLIは`bin/astra-jev cli`を入口とする独立したHarnessで、CLI専用の別Skillはありません。
+
+更新時はcheckout・資材と実行ファイルをv0.7.3で揃え、新しいplan・run出力先を使います。planはモデルを固定しないため、旧planから新しくrunしても現在のJevを使います。モデル名を含むcacheキーにより旧1.13の応答を1.14の応答として再利用せず、cacheの一括削除は不要です。保存済みの判定・失敗記録は元のまま保持し、モデル更新を過去の判定や候補の再検証とみなしません。rollbackはv0.7.2の実行ファイルと対応資材を組み合わせ、新しいplan・runを作ります。`verify`・`apply`の鮮度・整合性・権限検査は省略しません。
+
+判定閾値・入力上限・自動retryなし・許可済みのJevなし継続・依頼時のみの使用量報告を維持します。TypeSafeは1.14の多言語改善を発表していますが、Harnessの精度・速度・総費用の改善率は未測定です。[公式モデル仕様](https://docs.typesafe.ai/models) · [変更と更新手順](../README-ja.md#v073各方式のjevを114固定版へ更新)。
+
 ## 基本の流れ
 
 CLIの入口は `bin/astra-jev cli` です。`run`時、環境変数が未設定ならmacOSキーチェーン（service `astra-jev-harness` / account `TYPESAFE_API_KEY`）から補います。`plan` / `verify` / `apply` / ヘルプと明示的な`--mode astra`ではキーチェーンを読みません。`doctor`でキーの有無・取得元だけを確認できます。`keychain_timeout` / `keychain_unavailable`はキーの不在を意味しません。

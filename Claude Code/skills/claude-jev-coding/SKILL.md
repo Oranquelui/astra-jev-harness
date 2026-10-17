@@ -9,6 +9,8 @@ You (the current Claude Code session) implement, review and test the change with
 
 ## Entrypoint and credentials
 
+Harness v0.7.3 pins new Jev requests to `jev-1.14.0`, including requests made from older plans. It does not follow model aliases or change the active Claude model. The same native runtime serves Desktop, CLI and Claude Code. Keep the executable and checkout at the same release. After an upgrade, use a fresh plan and new output directory; preserve old judgments and failure records. Checking a saved 1.13 result does not turn it into a 1.14 evaluation. Model-specific cache keys separate the requests without deleting old caches. For upgrade/rollback details, read [Model updates and saved judgments](references/workflow.md#model-updates-and-saved-judgments).
+
 The supported runtime is the prebuilt Go executable in `bin/astra-jev`. Python and Go are not needed during coding. Build once with `scripts/build-native.sh` (Go 1.26+ and a C compiler), or use the matching platform release archive. Do not rebuild, benchmark or run model comparisons during normal coding. The historical `.py` files remain development references.
 
 
